@@ -2,7 +2,7 @@
 
 # ReBox — HR54-700 native media shell and Android controller
 
-<img src="docs/rebox-mascot.svg" width="240" alt="ReBox mascot" />
+<img src="docs/rebox-mascot.png" width="240" alt="ReBox mascot" />
 
 ![Build](https://img.shields.io/badge/build-hardware%20verified-34d399)
 ![Target](https://img.shields.io/badge/target-HR54--700-22d3ee)
