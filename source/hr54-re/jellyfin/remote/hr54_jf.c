@@ -2653,7 +2653,9 @@ static int frigate_play(const char *camera, struct sb *out) {
     int rc = frigate_camera(config, camera, stream, sizeof stream);
     jfree(config); if (rc) return -1;
     struct sb url = {0};
-    sb_fmt(&url, "http://%s:%d/api/go2rtc/api/stream.ts?src=", FRIGATE_HOST, FRIGATE_PORT);
+    /* Frigate 0.18 proxies go2rtc's MPEG-TS endpoint at the web root.
+       The older /api/go2rtc/api/stream.ts route now returns 404. */
+    sb_fmt(&url, "http://%s:%d/stream.ts?src=", FRIGATE_HOST, FRIGATE_PORT);
     url_encode(&url, stream);
     /* No relay/transcode: stock player fetches Frigate's HTTP TS directly. */
     state_lock(); S->ui_key_until = mono_now() + 6; state_unlock();

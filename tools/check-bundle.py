@@ -11,7 +11,7 @@ payload = root / 'receiver/payload/hr54-persist'
 expected = {
     'native-menu/hr54-ui': 'e014f494fa7a056666f4709c09632419',
     'native-menu/hr54-input-broker': '5524b8e01569cf8e66b7586a03874eba',
-    'jellyfin/bin/hr54-jf': 'c929dc866437cae707e1e0546650f523',
+    'jellyfin/bin/hr54-jf': '406e984b2c26e0ae1832b6d122238da3',
     'bin/hr54-play-url': '853fe5b3c7c6e0a61160af438b6cece0',
     'native-menu/dtv-menu-policy.car': 'c1b9e5ba4546c42f799cf580f048afb1',
     'jellyfin/doom/bin/hr54-doom-native': 'dc8d44e254cedc79e39c21036d36eedd',

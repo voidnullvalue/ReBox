@@ -3,7 +3,7 @@ f447ed6ec29de975cf79fb9a5d4c6c42  activate-native.sh
 853fe5b3c7c6e0a61160af438b6cece0  bin/hr54-play-url
 e48a609e2a4ffd69c6c3f0bfd6f3cbc8  deactivate-native.sh
 5b300467b1abacab9ca170064aecd041  jellyfin/bin/hr54-iptv-fetch
-c929dc866437cae707e1e0546650f523  jellyfin/bin/hr54-jf
+406e984b2c26e0ae1832b6d122238da3  jellyfin/bin/hr54-jf
 d41d8cd98f00b204e9800998ecf8427e  jellyfin/doom/ENABLED
 b234ee4d69f5fce4486a80fdaf4a4263  jellyfin/doom/LICENSE.txt
 dc8d44e254cedc79e39c21036d36eedd  jellyfin/doom/bin/hr54-doom-native

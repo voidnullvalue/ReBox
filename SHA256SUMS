@@ -13,7 +13,7 @@ d8d7638b70e6785235b74704b734dffe435a21c4ec1cc65f73165385af967c12  ./receiver/pay
 fc6b83dbfcd42166e5255b3ae603101cb7992c996110dd5abe18e7e231edc4a9  ./receiver/payload/hr54-persist/bin/hr54-play-url
 9ea0e7db8e00a09fe63796bb485289cf2e9694fd6b8204ab3fae3a8856dd840a  ./receiver/payload/hr54-persist/deactivate-native.sh
 48893880aaabc8afb7075a81ea3f02406df38beb57d37bb283c9f2163b21f54a  ./receiver/payload/hr54-persist/jellyfin/bin/hr54-iptv-fetch
-5b8db34fbd9ed67da0ebe889754bca335611f6c525aeba4b1508545cf5bd038a  ./receiver/payload/hr54-persist/jellyfin/bin/hr54-jf
+5cabba8bf70e5596a2e5c28785ee6ccf130b2b30fb02691747cee6b4c7b799e9  ./receiver/payload/hr54-persist/jellyfin/bin/hr54-jf
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./receiver/payload/hr54-persist/jellyfin/doom/ENABLED
 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643  ./receiver/payload/hr54-persist/jellyfin/doom/LICENSE.txt
 1df7a0d5293ed27fa00ac5b281b84af489475d1387d3f1bea9cdc562678ed9a6  ./receiver/payload/hr54-persist/jellyfin/doom/bin/hr54-doom-native
@@ -51,7 +51,7 @@ fcffdbcb3bf5237ca11a856b54660bdb4021e79157a85c777381e1dd9fc52287  ./receiver/pay
 a7e2399e62bf5df4690a7527b4042a0471165677d5ebbc14a8457b55d6d4f06f  ./receiver/payload/hr54-persist/native-menu/policy.md5
 15a264874546c7412b75cbe88cbb8857d6418da95ca3abb9fe32325222581470  ./receiver/payload/hr54-persist/native-menu/rf-input-ready.sh
 8c3ef98edd2387331778c09f4a3ee4be9aee2b940bc7f63bd2d9c41d2f875fd4  ./receiver/payload/hr54-persist/native-menu/supervisor.sh
-fce03a4a080036143616df11a0907ba78df376eb862f69f090075336bbd8e217  ./receiver/payload/hr54-persist/payload.md5
+ddfffae58038f8d601f7e7c7d4164e80e96bd98a10cf0e9aa63716624b98a1a2  ./receiver/payload/hr54-persist/payload.md5
 a18f5f67edb8270375b84d5dbd576f5ae93529629fa3042e2d8b81e2517f8bed  ./receiver/payload/hr54-persist/rebox-start.sh
 82a478228f81e8f72068edba78e87dbc9b5eea96d28c82cedb7195ffe158b629  ./receiver/payload/hr54-persist/stock-firmware.md5
 08f5b217b1276b1f1abd132e60814f3dba49dce281644fe606a9105284fb7a93  ./source/android/app/build.gradle.kts
@@ -1586,7 +1586,7 @@ aaf66da99e16a163049656bd59744e69496ad038966194b80c58778690fedb28  ./source/hr54-
 9060c26fa48e8fd5ac5e6c9a550c302044f2a97c819d742cc8893fda47af3962  ./source/hr54-re/jellyfin/remote/hr54_iptv_fetch.c
 563ecbb989b6aa9038adddaa44c9157598c2900d8b0db02756e2bec664bb579b  ./source/hr54-re/jellyfin/remote/hr54_iptv_library.h
 66ebcf60fa65aa834949de2ba4250e925ee2d6eda7bb130dc968e8360cd9e11e  ./source/hr54-re/jellyfin/remote/hr54_iptv_relay.h
-f0548d0b944971a1be2cbf75e32ac4f7629ddcf7371f8d2060804f6dd12aae42  ./source/hr54-re/jellyfin/remote/hr54_jf.c
+7f7a046d39aa6197952897d1f98b0c2ccfb3af7af7610eaf380295009cdc34db  ./source/hr54-re/jellyfin/remote/hr54_jf.c
 526be3c26bc4e1c5998342fe0a8fa034303ab661f4d662905df397c6ffec801f  ./source/hr54-re/jellyfin/remote/hr54_www.c
 759658d1fe7f5460e35c54d1ea76dadf0570009f3a60be843eae8c33134e7031  ./source/hr54-re/jellyfin/remote/hr54_youtube.h
 e5b5f64f8f060515aa9e904d9bd4c90e978e83bb54eb8361e2e136a34f1a49ef  ./source/hr54-re/jellyfin/remote/static/app.css
@@ -1737,7 +1737,7 @@ aea56af2e28c22ee23c6d10bb50058cdab9fe903f6df265878f4bc15d252259c  ./stock-bootst
 3803357ef7821dbf691c901105fb9b2b00382abf67fce8a4be2a0d592267dc61  ./stock-bootstrap/vmlinux-4.19.0-21-4kc-malta
 3ce30b4017de73dfb478f3b13385296c733bba8ecc521bb6ec8cb9501fcb444b  ./stock-bootstrap/xfs.ko
 d8d7638b70e6785235b74704b734dffe435a21c4ec1cc65f73165385af967c12  ./tools/activate-native.sh
-e994b8ddc666c25f4f420fbced9d4fdcf62d4c2f6daa921993816efffd6079ce  ./tools/check-bundle.py
+4de6de1bfe2306ee56f5260ee2dfb877fd4b45adbce88d816c8105a9d9dff581  ./tools/check-bundle.py
 9ea0e7db8e00a09fe63796bb485289cf2e9694fd6b8204ab3fae3a8856dd840a  ./tools/deactivate-native.sh
 0b39e01db464bb347c9740cde5496146ede2808b3ddf8558c963e00df95c4263  ./tools/plugin_verify.py
 d042d59023869cd73125a21edd7798a43443a75cda7b7590e25edd6599a3c37b  ./tools/prepare-stock-image.sh
