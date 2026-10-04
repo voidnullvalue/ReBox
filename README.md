@@ -1,4 +1,18 @@
+<div align="center">
+
 # ReBox — HR54-700 native media shell and Android controller
+
+<img src="docs/rebox-mascot.svg" width="240" alt="ReBox mascot" />
+
+![Build](https://img.shields.io/badge/build-hardware%20verified-34d399)
+![Target](https://img.shields.io/badge/target-HR54--700-22d3ee)
+![Status](https://img.shields.io/badge/status-experimental-f59e0b)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-yellow.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-MIPS-7F52FF)
+
+</div>
+
+---
 
 This is a self-contained installation/development bundle assembled on
 2026-10-04 from the physically accepted repaired receiver deployment.
