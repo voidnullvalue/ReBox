@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HR54 Jellyfin Remote</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="dot" id="dot"></span>
+    <div>
+      <h1>Jellyfin</h1>
+      <p id="who">connecting&hellip;</p>
+    </div>
+  </div>
+  <form class="search" id="searchForm" autocomplete="off">
+    <input id="search" type="search" placeholder="Search movies &amp; episodes" aria-label="Search">
+    <button type="submit">Search</button>
+  </form>
+</header>
+
+<main>
+  <nav class="libs" id="libs" aria-label="Libraries"></nav>
+
+  <section class="content">
+    <div class="nowplaying" id="nowplaying" hidden>
+      <div class="np-text">
+        <span class="np-label" id="npLabel">Now playing on TV</span>
+        <strong id="npName"></strong>
+        <span id="npTime" class="np-time">0:00</span>
+      </div>
+      <button id="npStop" class="danger">Stop</button>
+    </div>
+
+    <h2 id="heading">Library</h2>
+    <div class="grid" id="grid"></div>
+    <p class="empty" id="empty" hidden>Nothing matched.</p>
+  </section>
+
+  <aside class="detail" id="detail" hidden>
+    <button class="close" id="detailClose" aria-label="Close">&times;</button>
+    <img id="dArt" alt="">
+    <h3 id="dName"></h3>
+    <p class="meta" id="dMeta"></p>
+    <p class="overview" id="dOverview"></p>
+    <button class="primary" id="dPlay">Play on TV</button>
+  </aside>
+</main>
+
+<footer class="pad">
+  <div class="dpad">
+    <button data-key="up" class="up" aria-label="Up">&#9650;</button>
+    <button data-key="left" class="left" aria-label="Left">&#9664;</button>
+    <button data-key="select" class="ok" aria-label="Select">OK</button>
+    <button data-key="right" class="right" aria-label="Right">&#9654;</button>
+    <button data-key="down" class="down" aria-label="Down">&#9660;</button>
+  </div>
+  <div class="transport">
+    <button data-transport="back" title="Back 15 seconds">&#171; 15</button>
+    <button data-transport="rew" title="Back 60 seconds">&#9664;&#9664; 60</button>
+    <button data-transport="play" id="tPlay">Play</button>
+    <button data-transport="pause" id="tPause">Pause</button>
+    <button data-transport="fwd" title="Forward 60 seconds">60 &#9654;&#9654;</button>
+    <button data-transport="stop" class="danger">Stop</button>
+  </div>
+  <div class="misc">
+    <button data-key="guide">Guide</button>
+    <button data-key="info">Info</button>
+    <button data-key="menu">Menu</button>
+    <button data-key="exit">Exit</button>
+  </div>
+</footer>
+
+<div class="toast" id="toast" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

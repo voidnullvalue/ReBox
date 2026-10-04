@@ -1,0 +1,4 @@
+#include "screens.h"
+void render_settings(UiFramebuffer *f,App *a){render_header(f,"Settings","Make yourself at home");const char *labels[]={"Jellyfin picture quality","Connect Jellyfin","Disconnect account","Return home"};for(int i=0;i<4;i++){int y=UI_CONTENT_Y+15+i*58,focus=a->settings_focus==i;if(focus){draw_round(f,UI_SAFE_X-8,y-10,UI_WIDTH-2*UI_SAFE_X+16,48,5,COLOR(32,32,38,245),COLOR(32,32,38,245));ui_fb_rect(f,(UiRect){UI_SAFE_X-8,y-5,2,38},UI_ACCENT);}draw_text(f,UI_SAFE_X+9,y,labels[i],22,focus?UI_INK:UI_MUTED,430);if(i==0){char v[64];snprintf(v,sizeof(v),"%d Mbps",a->bitrate/1000000);draw_text(f,UI_WIDTH-UI_SAFE_X-124,y,v,22,focus?UI_ACCENT:UI_MUTED,120);}}
+    draw_wrap(f,UI_SAFE_X+9,UI_CONTENT_Y+265,a->loading?"Saving your preferences…":"Picture quality applies to your next Jellyfin video.",18,UI_MUTED,620,2);render_footer(f,"LEFT / RIGHT  Adjust     SELECT  Save / Open","BACK  Home");
+}

@@ -1,0 +1,78 @@
+html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:#07111f;color:#f5f9ff;font-family:Arial,sans-serif}
+*{box-sizing:border-box}
+#root{position:absolute;top:0;left:0;width:100%;height:100%;background:#07111f;overflow:hidden}
+#backdrop{position:absolute;top:0;left:0;width:100%;height:100%;background:#07111f;z-index:0}
+button{font-family:Arial,sans-serif;color:#fff;border:3px solid #344861;background:#172b43;border-radius:7px;cursor:pointer}
+button.focus{border-color:#fff;background:#087bdc;color:#fff;box-shadow:0 0 0 4px #f0b83e}
+button:focus{outline:none}
+.hidden{display:none!important}
+#top{position:absolute;top:0;left:0;width:100%;height:15%;background:#102138;padding:1% 4%;border-bottom:2px solid #3e5d7b;z-index:1}
+#brand{float:left;font-size:50px;font-weight:bold;letter-spacing:2px;color:#70bcff;line-height:1.4}
+#backButton,#searchButton,#accountButton{float:right;width:19%;height:90%;margin-left:1%;font-size:31px;font-weight:bold;text-align:center}
+#browse{position:absolute;top:15%;left:0;width:100%;height:85%;padding:1.4% 4% 2%;z-index:1}
+#libraries{height:15%;width:100%;white-space:nowrap;overflow:hidden}
+#libraries button{display:inline-block;width:22%;height:85%;margin-right:1%;font-size:32px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+#libraries button.active{background:#315579}
+#heading{height:11%;font-size:42px;font-weight:bold;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#items{height:64%;width:100%;overflow:hidden}
+.card{float:left;position:relative;width:31.3%;height:45%;margin:0 2% 1.2% 0;padding:9px 12px;text-align:left;overflow:hidden}
+.card:nth-child(3n){margin-right:0}
+.card .title{display:block;font-size:36px;font-weight:bold;line-height:1.15;max-height:72%;overflow:hidden;word-wrap:break-word}
+.card .meta{display:block;font-size:27px;color:#bfd4e9;margin-top:5px}
+.card.unplayable{opacity:.65}
+/* Containers are dimmed by .unplayable, so re-assert full strength and mark
+   them so a folder is never mistaken for an unplayable title. */
+.card.folder{opacity:1;box-shadow:inset 0 0 0 4px #3f7fbf}
+.card.folder .meta{color:#8fd0ff}
+#pager{height:10%;text-align:center;white-space:nowrap}
+#pager button{height:90%;width:23%;font-size:30px;font-weight:bold}
+#pager span{display:inline-block;width:30%;font-size:28px;vertical-align:middle}
+#searchView{position:absolute;top:15%;left:0;width:100%;height:85%;padding:2% 5%;background:#07111f;z-index:2}
+#authView{position:absolute;top:15%;left:0;width:100%;height:85%;padding:8% 10%;background:#07111f;z-index:2;text-align:center}
+#authTitle{font-size:54px;font-weight:bold;color:#70bcff}
+#authText{font-size:36px;margin:4% auto;max-width:85%}
+#authCode{font-size:100px;font-weight:bold;letter-spacing:10px;min-height:130px;color:#fff}
+#authAction{width:36%;height:95px;font-size:36px;font-weight:bold}
+#queryLabel{font-size:34px;color:#9dcaee;height:9%}
+#query{height:15%;font-size:48px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:3px solid #5396cf}
+#queryInput{height:15%;font-size:48px;line-height:1.3;white-space:nowrap;background:transparent;color:#f5f9ff;font-family:Arial,sans-serif;border:0;border-bottom:3px solid #5396cf;padding:0;width:100%}
+#queryInput:focus{outline:none;border-bottom-color:#f0b83e}
+#keyboard{height:72%;padding-top:1%}
+.keyrow{height:16%;white-space:nowrap;text-align:center}
+.key{display:inline-block;width:12.6%;height:91%;margin:0 .4%;font-size:38px;font-weight:bold;text-align:center;vertical-align:top}
+.key.wide{width:27%}
+.keyrow:last-child .key.wide{width:19%}
+#message{position:absolute;left:8%;top:30%;width:84%;padding:4%;border:5px solid #6ab7ff;background:#112940;font-size:36px;text-align:center;z-index:3;word-wrap:break-word}
+@media (max-height:600px){#brand{font-size:31px}#backButton,#searchButton,#accountButton{font-size:20px}#libraries button{font-size:21px}#heading{font-size:27px}.card .title{font-size:23px}.card .meta{font-size:18px}#pager button,#pager span{font-size:20px}#queryLabel{font-size:23px}#query{font-size:30px}#queryInput{font-size:30px}.key{font-size:23px}#message{font-size:29px}#authTitle{font-size:32px}#authText{font-size:23px}#authCode{font-size:55px;min-height:70px}#authAction{height:60px;font-size:24px}}
+
+#sourceView,#frigateView,#iptvView{position:absolute;top:15%;left:0;width:100%;height:85%;padding:3% 12%;z-index:2;background:#07111f}
+#sourceView button{display:block;width:100%;height:22%;margin-bottom:3%;font-size:48px;font-weight:bold;text-align:left;padding-left:5%}
+#sourceHint{font-size:28px;color:#bfd4e9}
+#iptvView{font-size:64px;text-align:center;padding-top:12%}
+#iptvView div{font-size:32px;margin-top:4%}
+#cameraList{height:90%;overflow:hidden}
+#cameraList button{display:block;width:100%;height:100px;margin-bottom:18px;font-size:38px;text-align:left;padding:12px 24px}
+@media (max-height:600px){#sourceView button{font-size:32px}#sourceHint{font-size:20px}#iptvView{font-size:42px}#iptvView div{font-size:24px}#cameraList button{height:65px;font-size:26px;margin-bottom:10px}}
+
+#iptvView{padding:2% 10%;font-size:32px;text-align:left}
+#iptvView div{margin-top:0;font-size:28px}
+#iptvHeading{height:10%;font-weight:bold}
+#iptvList{height:78%;overflow:hidden}
+#iptvList button{display:block;width:100%;height:13%;margin-bottom:1%;font-size:30px;text-align:left;padding:6px 20px;white-space:nowrap;overflow:hidden}
+#iptvPage{height:10%;text-align:center}
+@media(max-height:600px){#iptvList button{font-size:22px}#iptvView div{font-size:20px}}
+
+#sourceView button{height:17%;margin-bottom:2%}
+#youtubeView{position:absolute;top:15%;left:0;width:100%;height:85%;padding:2% 10%;z-index:2;background:#07111f}
+#youtubeHeading{height:10%;font-size:28px;font-weight:bold}
+#youtubeList{height:78%;overflow:hidden}
+#youtubeList button{display:block;width:100%;height:13%;margin-bottom:1%;font-size:30px;text-align:left;padding:6px 20px;white-space:nowrap;overflow:hidden}
+#youtubePage{height:10%;font-size:28px;text-align:center}
+@media(max-height:600px){#youtubeList button{font-size:22px}#youtubeHeading,#youtubePage{font-size:20px}}
+
+#sourceView button{height:14%;margin-bottom:2%}
+#qualityView{position:absolute;top:15%;left:0;width:100%;height:85%;padding:3% 10%;z-index:2;background:#07111f}
+#qualityHeading{font-size:38px;font-weight:bold;margin-bottom:3%}
+#qualityList button{display:block;width:100%;height:80px;margin-bottom:2%;font-size:32px;text-align:left;padding:6px 20px}
+#qualityHint{font-size:26px;line-height:1.5}
+@media(max-height:600px){#qualityHeading{font-size:28px}#qualityList button{height:60px;font-size:24px}#qualityHint{font-size:20px}}

@@ -1,0 +1,7 @@
+#ifndef HR54_UI_KEYS_H
+#define HR54_UI_KEYS_H
+#include "../platform.h"
+typedef enum { KEY_NONE,KEY_UP,KEY_DOWN,KEY_LEFT,KEY_RIGHT,KEY_SELECT,KEY_BACK,KEY_GUIDE,KEY_MENU,KEY_INFO,KEY_PLAY,KEY_PAUSE,KEY_STOP,KEY_FORWARD,KEY_REWIND,KEY_SKIP_FORWARD,KEY_SKIP_BACK,KEY_EXIT,KEY_LIST,KEY_RECORD,KEY_RED,KEY_GREEN,KEY_YELLOW,KEY_BLUE,KEY_COUNT } UiKey;
+typedef struct { UiKey key; int pressed,repeat; uint32_t raw; } KeyEvent;
+UiKey input_key(uint32_t);
+#endif

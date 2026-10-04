@@ -1,0 +1,18 @@
+{
+  "Overpass.ttf": {
+    "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/overpass/Overpass%5Bwght%5D.ttf",
+    "sha256": "970717df17a7f9911dee45f60695d05bfa9d745fa0a11fc5c348371fa21f0073"
+  },
+  "OFL.txt": {
+    "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/overpass/OFL.txt",
+    "sha256": "86e5ff25c701ec446d20b1a85b02ee6d36de8503a7288a4c948f5459809af1f0"
+  },
+  "icons/jellyfin.svg": {
+    "url": "https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/logos/SVG/jellyfin-icon--color-on-dark.svg",
+    "sha256": "cf3262b0eee6a47b8a09515ef01dd9a2151cb58022645e68acbf09efc9d0ed20"
+  },
+  "JELLYFIN-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/LICENSE",
+    "sha256": "6d4e2239c9605f95e1031309e8bd156dec62c55817427655003c57baceafb1e2"
+  }
+}

@@ -1,0 +1,39 @@
+#!/bin/sh
+# Portable variant of the physically proven asset-7 indexer boot hook.
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/opt/mp4lib/bin
+export PATH
+umask 077
+printf 'HR54_ROOT_EXEC\n' > /var/HR54_ROOT_PROOF
+if [ "${HR54_OFFLINE_TEST:-}" = 1 ]; then
+    printf 'HR54_BEACHHEAD_LAUNCHER_OK\n' > /var/HR54_BEACHHEAD_TEST
+    exit 22
+fi
+/bin/sync
+if /bin/mkdir /tmp/hr54-beachhead.starting 2>/dev/null; then
+    /bin/mkdir -p /var/hr54-beachhead /var/hr54-transfer
+    /bin/chmod 700 /var/hr54-beachhead /var/hr54-transfer
+    firewall_ok=1
+    restrict_port() {
+        proto=$1; port=$2
+        /usr/sbin/iptables -I INPUT 1 -p "$proto" --dport "$port" -j DROP || return 1
+        for net in 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16; do
+            /usr/sbin/iptables -I INPUT 1 -p "$proto" -s "$net" --dport "$port" -j ACCEPT || return 1
+        done
+    }
+    restrict_port tcp 5777 || firewall_ok=0
+    restrict_port udp 1069 || firewall_ok=0
+    restrict_port tcp 8130 || firewall_ok=0
+    if [ "$firewall_ok" = 1 ]; then
+        /opt/mp4lib/bin/hr54d </dev/null >>/var/hr54-beachhead/hr54d.log 2>&1 &
+        printf '%s\n' "$!" > /var/hr54-beachhead/hr54d.pid
+        /usr/sbin/in.tftpd -l -c -a 0.0.0.0:1069 -u root -s /var/hr54-transfer </dev/null >>/var/hr54-beachhead/tftpd.log 2>&1 &
+        printf 'LAN_SERVICES_STARTED tcp=5777 udp=1069 api=8130\n' > /var/hr54-beachhead/status
+        if [ -x /var/hr54-persist/rebox-start.sh ]; then
+            /var/hr54-persist/rebox-start.sh >>/var/hr54-beachhead/rebox-start.log 2>&1
+        fi
+    else
+        printf 'LAN_SERVICES_BLOCKED firewall_setup_failed\n' > /var/hr54-beachhead/status
+        /bin/rmdir /tmp/hr54-beachhead.starting
+    fi
+fi
+exec /opt/mp4lib/bin/indexer.real "$@"

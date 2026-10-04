@@ -1,0 +1,83 @@
+#!/bin/busybox ash
+# Only a cloned /var partition image and a disposable sparse RT device enter VM.
+set -eu
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin
+umask 077
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /mnt
+mounted=0
+finish() {
+    cd /
+    if [ "$mounted" = 1 ]; then umount /mnt || { echo REBOX_UNMOUNT_FAILED; poweroff -f; exit 1; }; fi
+    sync
+    [ "$#" = 0 ] || echo "$1"
+    poweroff -f
+}
+fail() { echo "REBOX_REFUSED: $*"; finish; }
+mode=audit
+case " $(cat /proc/cmdline) " in
+    *' rebox_mode=install '*) mode=install;;
+    *' rebox_mode=installed '*) mode=installed;;
+    *' rebox_mode=audit '*) :;;
+    *) fail 'missing operation';;
+esac
+for m in virtio virtio_ring virtio_pci virtio_blk crc32c_generic libcrc32c xfs; do
+    insmod "/modules/$m.ko" || fail "module $m"
+done
+sleep 2
+[ "$(cat /sys/class/block/vda/size)" = 31471329 ] || fail 'unsupported /var geometry'
+[ "$(cat /sys/class/block/vdb/size)" = 1920715328 ] || fail 'unsupported realtime geometry'
+mount -t xfs -o ro,norecovery,rtdev=/dev/vdb /dev/vda /mnt || fail 'read-only XFS mount'
+mounted=1
+plugins=/mnt/network/plugins
+registry=/mnt/mw_registry/Registry/Ucentric.CORE/Context/directv.DRUID
+[ -d "$plugins" ] && [ ! -L "$plugins" ] || fail 'plugin directory'
+anchor=$(sha256sum "$plugins/7_6932_6932.squashfs")
+case "$anchor" in fd0c08e0d6c79a1eb92713639dd720b5b01c743933c1b445351ba4ab0647b75e\ *) :;; *) fail 'genuine anchor mismatch';; esac
+if [ "$mode" = installed ]; then
+    cd /mnt/hr54-persist
+    md5sum -c payload.md5 || fail 'installed payload'
+    cmp /payload/rebox.conf rebox.conf || fail 'installed configuration'
+    cmp /payload/7_6933_6840.squashfs "$plugins/7_6933_6840.squashfs" || fail 'installed boot image'
+    cmp /payload/7_6933_6840.sig "$plugins/7_6933_6840.sig" || fail 'installed signature'
+    [ ! -e native-menu/ENABLED ] || fail 'unexpected activation'
+    finish REBOX_INSTALLED_READONLY_PASS
+fi
+for image in "$plugins"/7_*.squashfs; do
+    case "${image##*/}" in 7_6839_6839.squashfs|7_6930_6930.squashfs|7_6931_6931.squashfs|7_6932_6932.squashfs) :;; *) fail 'unsupported or modified asset-7 inventory';; esac
+done
+grep -q '^\* 7_6839 ' /mnt/network/SWMODULES.TXT || fail 'asset-7 manifest minimum'
+[ "$(cat "$registry/Context-Main.str")" = com.directv.druid.DruidMain ] || fail 'stock context'
+[ "$(cat "$registry/Auto-Start.str")" = true ] || fail 'stock Druid Auto-Start'
+[ ! -e /mnt/HR54_ROOT_PROOF ] && [ ! -e /mnt/hr54-persist ] || fail 'not a clean stock installation'
+[ ! -e "$plugins/7_6933_6840.sig" ] || fail 'destination signature exists'
+[ "$mode" = install ] || finish REBOX_STOCK_READONLY_PASS
+# These validation steps above performed no filesystem writes.
+umount /mnt || fail 'unmount before write'
+mounted=0
+echo REBOX_STOCK_READONLY_PASS
+mount -t xfs -o rw,rtdev=/dev/vdb /dev/vda /mnt || fail 'clone writable mount'
+mounted=1
+backup=$(mktemp -d /mnt/rebox-stock-backup.XXXXXX) || fail 'backup creation'
+cp -p "$registry/Context-Main.str" "$registry/Auto-Start.str" /mnt/network/SWMODULES.TXT "$backup/" || fail 'backup'
+printf 'Original install targets were absent; original partition clone is authoritative rollback.\n' > "$backup/README.txt"
+cp -a /payload/hr54-persist /mnt/hr54-persist.next || fail 'payload copy'
+chown -R 0:0 /mnt/hr54-persist.next || fail 'payload root ownership'
+cp /payload/rebox.conf /mnt/hr54-persist.next/rebox.conf || fail 'configuration copy'
+chmod 600 /mnt/hr54-persist.next/rebox.conf
+cd /mnt/hr54-persist.next
+md5sum -c payload.md5 || fail 'payload verification before promotion'
+cd /
+mv /mnt/hr54-persist.next /mnt/hr54-persist || fail 'payload promotion'
+cp /payload/7_6933_6840.squashfs "$plugins/.7_6933_6840.squashfs.rebox-next" || fail 'image copy'
+cp /payload/7_6933_6840.sig "$plugins/.7_6933_6840.sig.rebox-next" || fail 'signature copy'
+chmod 644 "$plugins/.7_6933_6840.squashfs.rebox-next" "$plugins/.7_6933_6840.sig.rebox-next"
+cmp /payload/7_6933_6840.squashfs "$plugins/.7_6933_6840.squashfs.rebox-next" || fail 'image verify'
+cmp /payload/7_6933_6840.sig "$plugins/.7_6933_6840.sig.rebox-next" || fail 'signature verify'
+sync
+mv "$plugins/.7_6933_6840.squashfs.rebox-next" "$plugins/7_6933_6840.squashfs"
+mv "$plugins/.7_6933_6840.sig.rebox-next" "$plugins/7_6933_6840.sig"
+sync
+finish REBOX_CLONE_INSTALL_PASS

@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<DcdpSetting>
+	<!-- HR54 Settings for Dash -->
+	<Dash>
+    	<MaxBufferedSegment>10</MaxBufferedSegment>
+    	<!-- Memory size in mb -->
+    	<MaxBuffer>50</MaxBuffer>
+    	<!-- Live streaming buffer in seconds -->    
+    	<Livestreaming>30</Livestreaming>
+    	<MaxResolutionLive>720</MaxResolutionLive>
+    	<MaxResolution>1080</MaxResolution>
+	</Dash>
+	<!-- Settings for DRM -->
+	<Drm>
+		<DrmType>Playready</DrmType>
+	</Drm>
+</DcdpSetting>

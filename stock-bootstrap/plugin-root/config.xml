@@ -1,0 +1,8 @@
+<plugin>
+	<id>7</id>
+	<version>6933</version>
+	<min_stack_version>6840</min_stack_version>
+	<feature name="mp4lib" class="com.directv.mw.plugins.feature.Mp4libFeatureStarter" init="true" reboot="true"/>
+	<feature name="hls" class="com.directv.mw.plugins.feature.HlsFeatureStarter" init="true" reboot="true"/>
+	<feature name="dcdp" init="true" reboot="true"/>
+</plugin>

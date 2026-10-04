@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Media Hub</title><link rel="stylesheet" href="/tv/app.css"></head>
+<body><div id="root"><div id="backdrop"></div>
+  <div id="top"><div id="brand">JELLYFIN</div><button id="backButton" type="button">BACK</button><button id="accountButton" type="button">ACCOUNT</button><button id="searchButton" type="button">SEARCH</button></div>
+  <div id="sourceView"><button id="sourceJellyfin">Jellyfin</button><button id="sourceFrigate">Frigate</button><button id="sourceIPTV">IPTV</button><button id="sourceYouTube">YouTube</button><button id="sourceSettings">Settings</button><div id="sourceHint">UP / DOWN · SELECT · BACK to exit</div></div>
+  <div id="frigateView" class="hidden"><div id="cameraList">Camera viewer coming next.</div></div>
+  <div id="iptvView" class="hidden"><div id="iptvHeading">IPTV</div><div id="iptvList"></div><div id="iptvPage"></div></div>
+  <div id="youtubeView" class="hidden"><div id="youtubeHeading">YouTube</div><div id="youtubeList"></div><div id="youtubePage"></div></div>
+  <div id="qualityView" class="hidden"><div id="qualityHeading">Jellyfin Video Quality</div><div id="qualityList"></div><div id="qualityHint">UP / DOWN · SELECT to save · BACK<br>Applies to the next title, seek or restart.</div></div>
+  <div id="browse">
+    <div id="libraries"></div>
+    <div id="heading"></div>
+    <div id="items"></div>
+    <div id="pager"><button id="prev" type="button">&#9664; PREV</button><span id="page"></span><button id="next" type="button">NEXT &#9654;</button></div>
+  </div>
+  <div id="searchView" class="hidden"><div id="queryLabel">SEARCH TITLE</div><div id="query"></div><input id="queryInput" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" maxlength="64" class="hidden"><div id="keyboard"></div></div>
+  <div id="authView" class="hidden"><div id="authTitle">JELLYFIN SIGN IN</div><div id="authText">Use Quick Connect to sign in.</div><div id="authCode"></div><button id="authAction" type="button">GET CODE</button></div>
+  <div id="message" class="hidden"></div>
+</div><script src="/tv/app.js"></script></body></html>

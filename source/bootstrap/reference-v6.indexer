@@ -1,0 +1,171 @@
+#!/bin/sh
+# Boot-time wrapper for the asset-7 indexer.  Mp4libFeatureStarter invokes
+# this path during its ordinary availability probe.
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/opt/mp4lib/bin
+export PATH
+umask 077
+
+# Keep the first action primitive and independent of every external command.
+printf 'HR54_ROOT_EXEC\n' > /var/HR54_ROOT_PROOF
+
+# This branch exists solely for recovered-rootfs/QEMU validation.  It uses
+# shell builtins only, because qemu-user cannot transparently exec a second
+# target-architecture program without host binfmt support.
+if [ "${HR54_OFFLINE_TEST:-}" = 1 ]; then
+    printf 'HR54_BEACHHEAD_LAUNCHER_OK\n' > /var/HR54_BEACHHEAD_TEST
+    exit 22
+fi
+
+/bin/sync
+
+# mkdir is an atomic, RAM-backed once-per-boot guard.  Repeated feature probes
+# still delegate to the genuine indexer but do not duplicate firewall rules or
+# listeners.
+if /bin/mkdir /tmp/hr54-beachhead.starting 2>/dev/null; then
+    /bin/mkdir -p /var/hr54-beachhead /var/hr54-transfer /var/hr54-inventory
+    /bin/chmod 700 /var/hr54-beachhead /var/hr54-transfer /var/hr54-inventory
+
+    # Reword the error-755 entries only.  englishtext-755.txt is a byte-for-byte
+    # copy of the vendor table with exactly S0807, S0808, S6259 and S6259_1
+    # replaced; S0755 and the 751/753/754/756/757/758 entries are untouched.
+    # The vendor SquashFS file remains the rollback target after umount.
+    #
+    # Ordering matters: Druid's LanguageManager::initialize() runs roughly
+    # T+638s, well after this hook (T+335s), so the overlay is in place before
+    # the string table is parsed.  Removing the file from persistent /var and
+    # rebooting restores the stock wording.
+    if [ -f /var/hr54-persist/overlays/englishtext-755.txt ]; then
+        /bin/mount --bind /var/hr54-persist/overlays/englishtext-755.txt \
+            /opt/ui_assets/assetspack/language/englishtext.txt \
+            >>/var/hr54-beachhead/755-text-mount.log 2>&1
+    fi
+
+    # A copy of the Settings layout can be enabled from persistent /var.
+    # The receiver's stock resource returns immediately after umount.
+    if [ -f /var/hr54-persist/jellyfin/ui/enable-settings-overlay ] &&
+       [ -f /var/hr54-persist/jellyfin/ui/STB_Settings.jellyfin.fb ]; then
+        /bin/mount --bind \
+            /var/hr54-persist/jellyfin/ui/STB_Settings.jellyfin.fb \
+            /opt/ui_assets/assetspack/curation/layouts/STB_Settings.fb \
+            >>/var/hr54-beachhead/jellyfin-settings-mount.log 2>&1
+    fi
+
+    # druid.properties carries remoteItvUrl, which the stock GREEN-key handler
+    # launches in the vendor ITV/WebKit renderer. Druid reads it only at
+    # startup, so an overlay has to exist before the middleware starts.
+    if [ -f /var/hr54-persist/jellyfin/ui/enable-itv-overlay ] &&
+       [ -f /var/hr54-persist/jellyfin/ui/druid.properties.jellyfin ]; then
+        /bin/mount --bind \
+            /var/hr54-persist/jellyfin/ui/druid.properties.jellyfin \
+            /opt/ui_assets/assetspack/config/druid.properties \
+            >>/var/hr54-beachhead/jellyfin-itv-mount.log 2>&1
+    fi
+
+    # Optional bouncing-screensaver artwork. Keep the stock PNG under the
+    # bind mount so removing the flag restores it on the next boot.
+    #
+    # NOTE: this overlay alone cannot change what the idle screensaver draws.
+    # DtvBouncingScreenSaver decodes images/screensaver.png into process memory
+    # when Druid initialises (T+127s), which is before this hook runs
+    # (T+335s), and no Druid/uconnect API reloads it.  Verified on hardware:
+    # binding a deliberately corrupt PNG changed nothing on screen, and
+    # terminating the Druid process only provoked the 20s siege watchdog
+    # reboot.  The artwork that actually reaches the screen is supplied by
+    # the selected plugin-23 image instead; see plugin-23-README.md.
+    if [ -f /var/hr54-persist/jellyfin/ui/enable-screensaver-overlay ] &&
+       [ -f /var/hr54-persist/jellyfin/ui/screensaver-hax0r.png ]; then
+        /bin/mount --bind \
+            /var/hr54-persist/jellyfin/ui/screensaver-hax0r.png \
+            /opt/ui_assets/assetspack/images/screensaver.png \
+            >>/var/hr54-beachhead/jellyfin-screensaver-mount.log 2>&1
+    fi
+
+    /opt/mp4lib/bin/collect-inventory \
+        >>/var/hr54-beachhead/inventory-launch.log 2>&1 &
+    printf '%s\n' "$!" > /var/hr54-beachhead/inventory.pid
+
+    firewall_ok=1
+
+    # Insert a default drop first, then insert the explicitly local source
+    # networks above it.  Services are not launched if any rule fails.
+    restrict_port()
+    {
+        proto="$1"
+        port="$2"
+        /usr/sbin/iptables -I INPUT 1 -p "$proto" --dport "$port" \
+            -j DROP || return 1
+        for source_net in 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 \
+                          192.168.0.0/16 169.254.0.0/16
+        do
+            /usr/sbin/iptables -I INPUT 1 -p "$proto" \
+                -s "$source_net" --dport "$port" -j ACCEPT || return 1
+        done
+        return 0
+    }
+
+    restrict_port tcp 5777 || firewall_ok=0
+    restrict_port udp 1069 || firewall_ok=0
+
+    if [ "$firewall_ok" = 1 ]; then
+        /opt/mp4lib/bin/hr54d </dev/null \
+            >>/var/hr54-beachhead/hr54d.log 2>&1 &
+        printf '%s\n' "$!" > /var/hr54-beachhead/hr54d.pid
+
+        /usr/sbin/in.tftpd -l -c -a 0.0.0.0:1069 -u root \
+            -s /var/hr54-transfer </dev/null \
+            >>/var/hr54-beachhead/tftpd.log 2>&1 &
+        printf '%s\n' "$!" > /var/hr54-beachhead/tftpd-launch.pid
+        printf 'LAN_SERVICES_STARTED tcp=5777 udp=1069\n' \
+            > /var/hr54-beachhead/status
+    else
+        printf 'LAN_SERVICES_BLOCKED firewall_setup_failed\n' \
+            > /var/hr54-beachhead/status
+        /bin/rmdir /tmp/hr54-beachhead.starting
+    fi
+
+    # The complete Jellyfin TV service runs on this receiver.  It talks
+    # directly to Jellyfin; no development-host backend is required.
+    # A missing binary or failed bind is nonfatal to ordinary receiver boot.
+    if [ -f /var/hr54-persist/jellyfin/ui/enable-local-www ] &&
+       [ -x /var/hr54-persist/jellyfin/bin/hr54-jf ] &&
+       [ -f /var/hr54-persist/jellyfin/www/tv/index.html ]; then
+        /usr/sbin/iptables -I INPUT 1 -i eth0 -s 192.168.88.0/24 \
+            -p tcp --dport 8130 -j ACCEPT &&
+        /sbin/start-stop-daemon -S -b -m \
+            -p /var/hr54-persist/jellyfin/jf.pid \
+            -x /var/hr54-persist/jellyfin/bin/hr54-jf -- \
+            /var/hr54-persist/jellyfin/www 192.168.88.38 8096 8130 \
+            >>/var/hr54-persist/jellyfin/log/jf.log 2>&1
+    fi
+
+    # Self-healing check on the asset-7/asset-23 plugin replacements.  Plugin 23
+    # is signed against plugin 7's genuine image, so if anything ever prunes
+    # /var/network/plugins the pair is restored from the persistent backup and
+    # the next boot selects it again.  Runs after plugin mounting, so a restore
+    # lands on the next boot rather than this one.  Pure repair: no network
+    # access and no update mechanism is disabled.
+    if [ -f /var/hr54-persist/bin/hr54-verify-assets ]; then
+        /bin/chmod 700 /var/hr54-persist/bin/hr54-verify-assets
+        /var/hr54-persist/bin/hr54-verify-assets \
+            >>/var/hr54-beachhead/verify-assets-launch.log 2>&1
+    fi
+
+    /bin/sync
+
+    # Production rcS deletes /var/opt before plugin startup. Restore runtime
+    # commands from the persistent /var/hr54-persist tree after that cleanup.
+    if [ -d /var/hr54-persist/bin ]; then
+        /bin/mkdir -p /var/opt/hr54/bin /var/opt/hr54/log
+        /bin/cp /var/hr54-persist/bin/* /var/opt/hr54/bin/
+        /bin/chmod 700 /var/opt/hr54/bin/*
+        if [ -f /var/hr54-persist/normal-mode.enabled ]; then
+            /var/opt/hr54/bin/hr54-normal-mode enable \
+                >>/var/hr54-beachhead/normal-mode-launch.log 2>&1
+        fi
+    fi
+fi
+
+# Preserve all normal feature behavior and diagnostics after establishing the
+# beachhead.  This is the unmodified vendor indexer from the genuine image.
+exec /opt/mp4lib/bin/indexer.real "$@"

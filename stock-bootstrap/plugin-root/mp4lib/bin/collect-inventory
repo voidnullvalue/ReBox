@@ -1,0 +1,54 @@
+#!/bin/sh
+# Persist a conservative first-boot hardware inventory on partition 2.
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export PATH
+umask 077
+out=/var/hr54-inventory
+/bin/mkdir -p "$out"
+
+printf 'HR54_INVENTORY_STARTED\n' > "$out/STATUS"
+/bin/uname -a > "$out/uname.txt" 2>&1
+
+for proc_name in cpuinfo cmdline iomem interrupts devices modules mtd \
+                 kallsyms mounts partitions meminfo version
+do
+    if [ -r "/proc/$proc_name" ]; then
+        /bin/cat "/proc/$proc_name" > "$out/proc-$proc_name.txt" 2>&1
+    fi
+done
+
+if [ -r /proc/config.gz ]; then
+    /bin/cp /proc/config.gz "$out/config.gz"
+fi
+
+/bin/dmesg > "$out/dmesg.txt" 2>&1
+/bin/mount > "$out/mount.txt" 2>&1
+/sbin/ifconfig -a > "$out/ifconfig.txt" 2>&1
+/sbin/route -n > "$out/route.txt" 2>&1
+
+if [ -r /proc/net/dev ]; then
+    /bin/cat /proc/net/dev > "$out/proc-net-dev.txt" 2>&1
+fi
+if [ -r /proc/net/route ]; then
+    /bin/cat /proc/net/route > "$out/proc-net-route.txt" 2>&1
+fi
+
+for tree_name in devices bus class firmware
+do
+    if [ -d "/sys/$tree_name" ]; then
+        /usr/bin/find "/sys/$tree_name" -print \
+            > "$out/sys-$tree_name.paths" 2>&1
+    fi
+done
+
+for lib_tree in modules firmware
+do
+    if [ -d "/lib/$lib_tree" ]; then
+        /usr/bin/find "/lib/$lib_tree" -print \
+            > "$out/lib-$lib_tree.paths" 2>&1
+    fi
+done
+
+printf 'HR54_INVENTORY_COMPLETE\n' > "$out/STATUS"
+/bin/sync

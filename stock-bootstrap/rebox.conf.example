@@ -1,0 +1,4 @@
+# Copy to rebox.conf and use YOUR Jellyfin server's numeric IPv4 address.
+# No shell quotes, passwords, tokens, URLs, or trailing spaces.
+JELLYFIN_IPV4=192.0.2.10
+JELLYFIN_PORT=8096

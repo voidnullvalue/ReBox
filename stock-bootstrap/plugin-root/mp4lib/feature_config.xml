@@ -1,0 +1,1 @@
+<feature name="mp4lib" version="6933" min_stack_version="6840" class="com.directv.mw.plugins.feature.Mp4libFeatureStarter" init="true" reboot="true"/>

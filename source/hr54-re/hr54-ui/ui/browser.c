@@ -1,0 +1,11 @@
+#include "screens.h"
+static const char *names[]={"Jellyfin","IPTV","Frigate","YouTube"};
+void render_browser(UiFramebuffer *f,App *a){BrowseNode *n=app_node(a);if(!n)return;render_header(f,names[a->source],n->title);
+    if(a->loading){draw_text(f,UI_SAFE_X,UI_CONTENT_Y+50,"Loading your library",22,UI_INK,0);draw_text(f,UI_SAFE_X,UI_CONTENT_Y+90,"BACK to return",18,UI_MUTED,0);return;}
+    if(!n->list.count){draw_text(f,UI_SAFE_X,UI_CONTENT_Y+50,"Nothing here yet",30,UI_INK,0);draw_wrap(f,UI_SAFE_X,UI_CONTENT_Y+102,a->source==SOURCE_YOUTUBE?"Try a different search.":"Choose another collection or return home.",18,UI_MUTED,500,3);render_footer(f,"BACK  Return","INFO  Search");return;}
+    int first=n->selection/6*6;
+    for(int row=0;row<6;row++){int i=first+row;if(i>=n->list.count)break;MediaItem *x=&n->list.item[i];int y=UI_CONTENT_Y+row*UI_ROW_HEIGHT;int selected=i==n->selection;if(selected){draw_round(f,UI_LIST_X-8,y-9,UI_LIST_W+16,UI_ROW_HEIGHT-3,5,COLOR(32,32,38,245),COLOR(32,32,38,245));ui_fb_rect(f,(UiRect){UI_LIST_X-8,y-5,2,UI_ROW_HEIGHT-11},UI_ACCENT);}draw_text(f,UI_LIST_X+8,y,x->title,18,selected?UI_INK:UI_MUTED,UI_LIST_W-35);if(x->folder)draw_text(f,UI_LIST_X+UI_LIST_W-16,y,"›",18,UI_MUTED,20);}
+    const MediaItem *x=app_selected(a);if(x){int y=UI_CONTENT_Y;const ArtEntry *art=artwork_find(&a->artwork,x->id);if(a->source==SOURCE_JELLYFIN){artwork_draw(f,art,UI_DETAIL_X,y);y+=ART_H+18;}else{draw_icon(f,a->source,UI_DETAIL_X+(UI_DETAIL_W-78)/2,y+5,78,600);y+=108;}
+        draw_wrap(f,UI_DETAIL_X,y,x->title,22,UI_INK,UI_DETAIL_W,2);y+=56;char meta[128];if(x->year)snprintf(meta,sizeof(meta),"%d  ·  %ld min",x->year,x->duration/60);else ui_copy(meta,sizeof(meta),x->subtitle[0]?x->subtitle:x->folder?"Collection":a->source==SOURCE_IPTV?"Live television":a->source==SOURCE_FRIGATE?"Live camera":"Video");draw_text(f,UI_DETAIL_X,y,meta,14,UI_MUTED,UI_DETAIL_W);}
+    char page[64];snprintf(page,sizeof(page),"%d / %d%s",a->source==SOURCE_YOUTUBE?n->selection+1:n->offset+n->selection+1,n->list.total,n->list.has_more?"  +":"");render_footer(f,a->source==SOURCE_FRIGATE?"SELECT  Watch     BACK  Home":"SELECT  Open     INFO  Search     BACK  Return",page);
+}

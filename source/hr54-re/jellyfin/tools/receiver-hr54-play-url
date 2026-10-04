@@ -1,0 +1,31 @@
+#!/bin/sh
+# Receiver-side player. Never writes or prints URLs containing Jellyfin tokens.
+set -eu
+url=${1:?Usage: hr54-play-url URL}
+case "$url" in http://*) ;; *) echo 'Expected an HTTP URL' >&2; exit 2;; esac
+[ "${#url}" -le 4096 ] || exit 2
+case "$url" in *'
+'*|*''*) exit 2;; esac
+native=${HR54_NATIVE_FRONTEND:-0}
+if [ -f /var/hr54-persist/native-menu/ENABLED ] &&
+   [ -f /var/hr54-persist/native-menu/ACTIVATED ]; then native=1; fi
+if [ "$native" != 1 ]; then
+osd=/var/mw_registry/Registry/Device/Server/OSD/Current
+if [ "$(cat "$osd/Number" 2>/dev/null)" = '"36"' ] &&
+   [ "$(cat "$osd/Extension" 2>/dev/null)" = 775 ]; then
+  /usr/bin/dt removeOsd -osd 36 -session 0 >/dev/null 2>&1 || :
+fi
+# Stock UI can leave a screensaver over the video plane. These SHEF keys
+# dismissed it in the physical playback proof.
+for key in info exit; do
+  wget -qO- "http://127.0.0.1:8080/remote/processKey?key=$key&hold=keyPress" >/dev/null 2>&1 || :
+done
+fi
+escaped=$(printf '%s' "$url" | sed -e 's/\&/\&amp;/g' -e 's/"/\&quot;/g' -e "s/'/\&apos;/g" -e 's/</\&lt;/g' -e 's/>/\&gt;/g')
+request="<com.ucentric.pvruconnect.DirectTest command=\"playURL\" url=\"$escaped\"/>"
+reply=$(/opt/middleware_core/system/tv/uconntest "$request" 2>&1) || :
+rc=0
+case "$reply" in *'pvruconnect.DirectTest done'*) ;; *) rc=1;; esac
+printf '%s playURL invoked rc=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$rc" >> /var/opt/hr54/log/play-url.log
+case "$reply" in *Exception*|*ERROR*) rc=1;; esac
+exit "$rc"

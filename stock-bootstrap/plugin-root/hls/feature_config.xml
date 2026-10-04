@@ -1,0 +1,1 @@
+<feature name="hls" version="6933" min_stack_version="6840" class="com.directv.mw.plugins.feature.HlsFeatureStarter" init="true" reboot="true"/>
