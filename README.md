@@ -15,7 +15,7 @@
 
 ReBox is a replacement userland shell for the DIRECTV HR54-700. It keeps the useful vendor plumbing — Linux, the Broadcom media stack, HDMI, RF remote support and the existing compositor — and replaces the part I actually care about: what the box does after it boots.
 
-Right now that means a custom native UI, a LAN API, Jellyfin playback, IPTV, YouTube, a Frigate viewer, native Doom, and an Android controller. The goal is not to turn the HR54 into a generic Linux PC. The vendor media stack already does the hard hardware-specific shit. ReBox uses it instead of pretending it does not exist.
+Right now that means a custom native UI, a LAN API, Jellyfin playback, IPTV, YouTube, a Frigate viewer, native Doom, and an Android controller. The goal is not to turn the HR54 into a generic Linux PC. The vendor media stack already does the hard hardware-specific work. 
 
 > [!WARNING]
 > **ReBox is early alpha software.**
@@ -72,7 +72,7 @@ The currently supported stock layout is the specific 1 TB HR54-700 build used fo
 - exact `/var` partition size: **16,113,320,448 bytes**
 - exact realtime partition size: **983,406,247,936 bytes**
 
-The installer and native activation also verify exact hashes from the known vendor build. Unsupported firmware or disk geometry is supposed to fail closed. Do not remove those checks because your box "looks close enough."
+The installer and native activation also verify exact hashes from the known vendor build. Unsupported firmware or disk geometry is supposed to fail closed. Do not remove those checks because your box "looks close enough." If you choose to ignore this warning, please report back how it goes!
 
 Model number alone does not establish compatibility.
 
@@ -117,7 +117,7 @@ Use a trusted or isolated LAN/VLAN. Do not port-forward these services to the In
 
 ## repo layout
 
-| Path | What is in it |
+| Path | What is in it |ReBox uses it instead of pretending it does not exist.
 | --- | --- |
 | `android/ReBox-controller.apk` | Current Android controller APK |
 | `receiver/payload/hr54-persist/` | Native UI, input broker, API/backend, `playURL` wrapper, Doom and media runtimes |
