@@ -44,11 +44,24 @@ interface ReceiverApi {
     suspend fun get(path: String, query: Map<String, String> = emptyMap()): JsonObject
 
     suspend fun post(path: String, body: JsonObject = JsonObject(emptyMap())): JsonObject
+    suspend fun delete(path: String): JsonObject = throw ReceiverFailure("DELETE unavailable")
+    fun setManagementToken(token: String?) {}
 }
+fun managementRequest(method: String, path: String): Boolean = method != "GET" &&
+    (path == "/api/modules/install" || path == "/api/management/revoke" || path == "/api/management/pair/open" ||
+        (path.startsWith("/api/modules/") && (method == "DELETE" || path.substringAfterLast('/') in setOf("enable", "disable", "reinstall", "settings") || path.contains("/actions/"))))
+fun longOperation(path: String): Boolean = (path.startsWith("/api/modules/") &&
+    (path.substringAfterLast('/') in setOf("browse", "search", "play", "install", "reinstall", "settings") || path.contains("/actions/"))) ||
+    path in setOf("/api/playback/resume", "/api/playback/seek")
+
 
 class HttpReceiverApi(val base: String) : ReceiverApi {
+    @Volatile private var managementToken: String? = null
+    override fun setManagementToken(token: String?) { managementToken = token }
     private val normal =
         OkHttpClient.Builder()
+            .followRedirects(false)
+            .followSslRedirects(false)
             .connectTimeout(8, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .callTimeout(20, TimeUnit.SECONDS)
@@ -56,22 +69,26 @@ class HttpReceiverApi(val base: String) : ReceiverApi {
     private val long =
         normal
             .newBuilder()
-            .readTimeout(100, TimeUnit.SECONDS)
-            .callTimeout(110, TimeUnit.SECONDS)
+            .readTimeout(240, TimeUnit.SECONDS)
+            .callTimeout(250, TimeUnit.SECONDS)
             .build()
 
     override suspend fun get(path: String, query: Map<String, String>): JsonObject =
-        request(path, query, null)
+        request(path, query, null, "GET")
 
     override suspend fun post(path: String, body: JsonObject): JsonObject =
-        request(path, emptyMap(), body)
+        request(path, emptyMap(), body, "POST")
+
+    override suspend fun delete(path: String): JsonObject = request(path, emptyMap(), JsonObject(emptyMap()), "DELETE")
 
     private suspend fun request(
         path: String,
         query: Map<String, String>,
         body: JsonObject?,
+        method: String,
     ): JsonObject =
         withContext(Dispatchers.IO) {
+            require(path.startsWith("/api/") && !path.contains("?") && !path.contains("#")) { "Invalid API path" }
             val url =
                 (base + path)
                     .toHttpUrl()
@@ -83,13 +100,11 @@ class HttpReceiverApi(val base: String) : ReceiverApi {
                     .url(url)
                     .apply {
                         if (body != null)
-                            post(body.toString().toRequestBody("application/json".toMediaType()))
+                            method(method, body.toString().toRequestBody("application/json".toMediaType()))
+                        if (managementRequest(method, path)) managementToken?.let { header("Authorization", "Bearer $it") }
                     }
                     .build()
-            val slowPlayback = path in setOf(
-                "/api/play", "/api/playback/resume", "/api/playback/seek",
-            )
-            val call = (if (path.startsWith("/api/youtube/") || slowPlayback) long else normal).newCall(request)
+            val call = (if (longOperation(path)) long else normal).newCall(request)
             val raw =
                 suspendCancellableCoroutine<Pair<Int, String>> { continuation ->
                     continuation.invokeOnCancellation { call.cancel() }
@@ -105,7 +120,15 @@ class HttpReceiverApi(val base: String) : ReceiverApi {
                             override fun onResponse(call: Call, response: Response) {
                                 try {
                                     response.use {
-                                        val result = it.code to (it.body?.string() ?: "")
+                                        val buffer = okio.Buffer()
+                                        it.body?.source()?.let { source ->
+                                            while (true) {
+                                                val n = source.read(buffer, minOf(16384L, 2 * 1024 * 1024L + 1 - buffer.size))
+                                                if (n < 0) break
+                                                if (buffer.size > 2 * 1024 * 1024) throw ReceiverFailure("Receiver response exceeds limit")
+                                            }
+                                        }
+                                        val result = it.code to buffer.readUtf8()
                                         if (continuation.isActive) continuation.resume(result)
                                     }
                                 } catch (e: IOException) {
@@ -126,9 +149,9 @@ class HttpReceiverApi(val base: String) : ReceiverApi {
                 } catch (e: Exception) {
                     throw ReceiverFailure("Receiver returned an invalid JSON response", raw.first)
                 }
-            if (raw.first == 404 && path in setOf("/api/capabilities", "/api/state"))
+            if (raw.first == 404 && path in setOf("/api/modules", "/api/state", "/api/system/status"))
                 throw ReceiverFailure(
-                    "Receiver is reachable, but $path is missing. Update the receiver media server to the native-client API version. Server reason: ${obj["error"]?.jsonPrimitive?.contentOrNull ?: "HTTP 404"}",
+                    "Receiver is reachable, but $path is missing. Update the receiver media server to the runtime module API version. Server reason: ${obj["error"]?.jsonPrimitive?.contentOrNull ?: "HTTP 404"}",
                     raw.first,
                 )
             if (raw.first !in 200..299 || obj["ok"]?.jsonPrimitive?.booleanOrNull == false)

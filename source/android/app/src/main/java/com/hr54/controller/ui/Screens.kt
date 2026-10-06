@@ -1,503 +1,169 @@
 package com.hr54.controller.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.grid.*
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import com.hr54.controller.*
 import com.hr54.controller.data.model.*
 import com.hr54.controller.ui.components.*
+import kotlinx.serialization.json.*
 
 @Composable
-fun HomeScreen(
-    s: ControllerState,
-    navigate: (String) -> Unit,
-    action: (String, Int?) -> Unit,
-    seek: (Double) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    LazyVerticalGrid(
-        GridCells.Adaptive(160.dp),
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Card {
-                NowPlayingContent(
-                    s.playback,
-                    s.receiver,
-                    s.playback.duration ?: s.knownDurations[s.playback.itemId],
-                    s.busy,
-                    action,
-                    seek,
-                )
-            }
-        }
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Text(
-                "YOUR SOURCES",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-        items(s.capabilities.destinations().drop(1)) { SourceCard(it) { navigate(it) } }
-    }
-}
-
-@Composable
-fun JellyfinScreen(
-    s: ControllerState,
-    query: TextFieldValue,
-    onQuery: (TextFieldValue) -> Unit,
-    search: () -> Unit,
-    startAuth: () -> Unit,
-    select: (Item) -> Unit,
-    more: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        if (!s.auth.authenticated) {
-            EmptyState(
-                "Connect your Jellyfin library",
-                "Approve Quick Connect in Jellyfin. Your other sources remain available.",
-            )
-            s.auth.code?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.displayMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(24.dp),
-                )
-                Text(
-                    if (s.auth.expired) "Code expired. Start again." else "Waiting for approval…",
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                )
-            }
-            Button(onClick = startAuth, enabled = !s.loading, modifier = Modifier.padding(16.dp)) {
-                Text(
-                    if (s.auth.pending && !s.auth.expired) "New Quick Connect code"
-                    else "Start Quick Connect"
-                )
-            }
-            return@Column
-        }
-        WhisperTextField(
-            query,
-            onQuery,
-            "Search Jellyfin",
-            onSearch = search,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-        )
-        Text(
-            s.folders.lastOrNull()?.name ?: "Libraries",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        if (s.loading && s.items.isEmpty()) LoadingMediaGrid()
-        else
-            LazyVerticalGrid(
-                GridCells.Adaptive(125.dp),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // The receiver can return repeated IDs (for example Series seasons).
-                // Keep raw rows in state for server pagination; render each media item once.
-                items(s.items.distinctBy(Item::id), key = { it.id }) {
-                    MediaPosterCard(it, s.receiver) { select(it) }
-                }
-                if (s.items.size < s.itemTotal)
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        TextButton(onClick = more, enabled = !s.loading) { Text("Load more") }
-                    }
-                if (s.items.isEmpty() && !s.loading)
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        EmptyState("No items", "Try another search or library.")
-                    }
-            }
-    }
-}
-
-@Composable
-fun IptvScreen(
-    s: ControllerState,
-    query: TextFieldValue,
-    onQuery: (TextFieldValue) -> Unit,
-    search: () -> Unit,
-    group: (String) -> Unit,
-    play: (Channel) -> Unit,
-    more: () -> Unit,
-    wide: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        WhisperTextField(
-            query,
-            onQuery,
-            "Search channels",
-            onSearch = search,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-        )
-        Row(Modifier.weight(1f)) {
-            if (wide)
-                LazyColumn(
-                    Modifier.width(180.dp).fillMaxHeight(),
-                    contentPadding = PaddingValues(12.dp),
-                ) {
-                    item {
-                        FilterChip(
-                            selected = s.group.isEmpty(),
-                            onClick = { group("") },
-                            label = { Text("All channels") },
-                        )
-                    }
-                    items(s.groups, key = { it.name }) {
-                        FilterChip(
-                            selected = s.group == it.name,
-                            onClick = { group(it.name) },
-                            label = { Text("${it.name} (${it.count})") },
-                        )
+fun HomeScreen(s: ControllerState, navigate: (String) -> Unit, action: (String, Int?) -> Unit, seek: (Double) -> Unit, modifier: Modifier = Modifier) {
+    LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { Text("Your television", style = MaterialTheme.typography.headlineMedium) }
+        if (s.playback.playing) item { NowPlayingContent(s.playback, s.receiver, s.playback.duration, s.busy, action, seek) }
+        if (s.system.nativeModule.isNotEmpty()) item { Text("Running: ${s.module(s.system.nativeModule)?.name ?: s.system.nativeModule}") }
+        items(s.homeModules, key = { it.id }) { m ->
+            Card(onClick = { navigate(m.id) }, modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Artwork(moduleAsset(s.receiver, m.id), Modifier.size(64.dp), m.name)
+                    Column(Modifier.weight(1f)) {
+                        Text(m.name, style = MaterialTheme.typography.titleMedium)
+                        Text(if (m.healthy) m.description else m.error.ifBlank { "Module unavailable" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-            Column(Modifier.weight(1f)) {
-                if (!wide)
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        item {
-                            FilterChip(
-                                selected = s.group.isEmpty(),
-                                onClick = { group("") },
-                                label = { Text("All") },
-                            )
-                        }
-                        items(s.groups, key = { it.name }) {
-                            FilterChip(
-                                selected = s.group == it.name,
-                                onClick = { group(it.name) },
-                                label = { Text(it.name) },
-                            )
+            }
+        }
+        if (s.homeModules.isEmpty()) item { EmptyState("No enabled modules", "Open Settings → Modules to install or enable a module.") }
+    }
+}
+@Composable
+fun ModuleScreen(s: ControllerState, query: TextFieldValue, onQuery: (TextFieldValue) -> Unit, search: () -> Unit,
+    select: (MediaItem) -> Unit, more: () -> Unit, previous: () -> Unit, settings: () -> Unit, native: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val m = s.module(s.activeModule) ?: return
+    Column(modifier) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(s.cursor.title.ifBlank { m.name }, style = MaterialTheme.typography.titleMedium)
+            if (m.capabilities.settings) TextButton(onClick = settings) { Text("Module settings") }
+        }
+        if (m.kind == "native-app") {
+            EmptyState(m.name, m.description)
+            if (m.presentation.releaseSurface || m.presentation.releaseInput) Text("Launch with the HR54 remote so the receiver shell can release its display and input. You can stop the app here.", Modifier.padding(horizontal = 16.dp))
+            Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = { native(true) }, enabled = !s.busy && !s.system.mediaBusy && !m.presentation.releaseSurface && !m.presentation.releaseInput) { Text("Launch on HR54") }
+                if (s.system.nativeModule == m.id) OutlinedButton(onClick = { native(false) }, enabled = !s.busy) { Text("Stop app") }
+            }
+        } else {
+            if (m.capabilities.search) WhisperTextField(query, onQuery, "Search ${m.name}", onSearch = search, modifier = Modifier.fillMaxWidth().padding(16.dp))
+            if (s.page.items.isEmpty() && !s.loading) EmptyState(if (m.capabilities.browse || s.cursor.query.isNotEmpty()) "No items" else "Search this module", "Browse folders or enter a search above.")
+            LazyVerticalGrid(GridCells.Adaptive(170.dp), contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(s.page.items.distinctBy { it.id }, key = { it.id }) { item ->
+                    Card(onClick = { select(item) }, enabled = !s.loading && (item.kind != "item" || item.playable)) {
+                        if (item.artwork.isNotEmpty()) Artwork(moduleAsset(s.receiver, m.id, item.artwork), Modifier.fillMaxWidth().height(130.dp))
+                        Column(Modifier.padding(12.dp)) {
+                            Text(item.title, style = MaterialTheme.typography.titleMedium, maxLines = 3)
+                            Text(if (item.kind == "folder") "Folder" else item.subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (!item.playable && item.kind == "item") Text(item.description.ifBlank { "Unavailable" })
                         }
                     }
-                if (s.loading && s.channels.isEmpty()) LoadingMediaGrid()
-                else
-                    LazyVerticalGrid(
-                        GridCells.Adaptive(if (wide) 280.dp else 320.dp),
-                        contentPadding = PaddingValues(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(s.channels, key = { it.id }) { ChannelCard(it) { play(it) } }
-                        if (s.channelMore)
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                TextButton(onClick = more, enabled = !s.loading) {
-                                    Text("Load more channels")
-                                }
-                            }
-                        if (s.channels.isEmpty() && !s.loading)
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                EmptyState("No channels", "Try a different group or query.")
-                            }
-                    }
-            }
-        }
-    }
-}
-
-@Composable
-fun YoutubeScreen(
-    s: ControllerState,
-    query: TextFieldValue,
-    onQuery: (TextFieldValue) -> Unit,
-    search: () -> Unit,
-    play: (Video) -> Unit,
-    more: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier) {
-        WhisperTextField(
-            query,
-            onQuery,
-            "Search YouTube",
-            onSearch = search,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-        )
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            Button(onClick = search, enabled = !s.loading && query.text.isNotBlank()) {
-                Text("Search")
-            }
-        }
-        if (s.loading) {
-            LinearProgressIndicator(Modifier.fillMaxWidth().padding(16.dp))
-            Text(
-                "Searching YouTube… This can take up to a minute.",
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        LazyVerticalGrid(
-            GridCells.Adaptive(300.dp),
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items(s.videos, key = { it.id }) { video ->
-                val interaction = remember { MutableInteractionSource() }
-                Card(onClick = { play(video) }, enabled = !s.busy && video.thumbnail != null, interactionSource = interaction, modifier = pressMotion(interaction)) {
-                    Artwork(video.thumbnail, Modifier.fillMaxWidth().aspectRatio(16f / 9))
-                    Column(Modifier.padding(12.dp)) {
-                        Text(
-                            video.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 3,
-                        )
-                        Text(
-                            listOfNotNull(video.channel, video.duration?.let(::timeLabel))
-                                .joinToString(" · "),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (s.cursor.previousOffsets.isNotEmpty()) TextButton(onClick = previous, enabled = !s.loading) { Text("Previous page") }
+                        if (s.page.hasMore) TextButton(onClick = more, enabled = !s.loading) { Text("Next page") }
                     }
                 }
             }
-            if (s.videoMore)
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    TextButton(onClick = more, enabled = !s.loading) { Text("More results") }
-                }
-            if (s.videos.isEmpty() && !s.loading)
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    EmptyState(
-                        "Find something for the television",
-                        "Search videos, music and more. Playback stays on HR54.",
-                    )
-                }
         }
     }
 }
-
 @Composable
-fun CamerasScreen(s: ControllerState, play: (Camera) -> Unit, modifier: Modifier = Modifier) {
-    if (s.loading && s.cameras.isEmpty()) LoadingMediaGrid()
-    else
-        LazyVerticalGrid(
-            GridCells.Adaptive(170.dp),
-            modifier = modifier,
-            contentPadding = PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            items(s.cameras, key = { it.id }) { CameraCard(it) { play(it) } }
-            if (s.cameras.isEmpty() && !s.loading)
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    EmptyState(
-                        "No cameras available",
-                        "Camera availability comes from the receiver.",
-                    )
-                }
-        }
-}
-
-@Composable
-fun ReceiverSetup(
-    s: ControllerState,
-    value: TextFieldValue,
-    onValue: (TextFieldValue) -> Unit,
-    connect: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            Modifier.widthIn(max = 480.dp).padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            Text(
-                "HR54",
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text("Your television.\nYour media.", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                "Connect to your receiver to browse and play on the big screen.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            WhisperTextField(
-                value,
-                onValue,
-                "Receiver address",
-                maxBytes = 256,
-                modifier = Modifier.fillMaxWidth(),
-                onSearch = connect,
-            )
-            Text(
-                "192.168.88.103  ·  Default port 8130",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            Button(
-                onClick = connect,
-                enabled = !s.loading && value.text.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-            ) {
-                Text(if (s.loading) "Connecting…" else "Connect to receiver")
-            }
-            if (s.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
+fun ReceiverSetup(s: ControllerState, value: TextFieldValue, onValue: (TextFieldValue) -> Unit, connect: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+        Text("ReBox", style = MaterialTheme.typography.headlineLarge)
+        Text("Connect to your receiver", modifier = Modifier.padding(vertical = 16.dp))
+        WhisperTextField(value, onValue, "Receiver address", maxBytes = 256, onSearch = connect)
+        s.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Button(onClick = connect, enabled = !s.loading && value.text.isNotBlank()) { Text(if (s.loading) "Connecting…" else "Connect to receiver") }
     }
 }
-
 @Composable
-fun SettingsScreen(
-    s: ControllerState,
-    value: TextFieldValue,
-    onValue: (TextFieldValue) -> Unit,
-    connect: () -> Unit,
-    test: () -> Unit,
-    modelStatus: String,
-    logout: () -> Unit,
-) {
-    LazyColumn(
-        contentPadding = PaddingValues(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
+fun SettingsScreen(s: ControllerState, value: TextFieldValue, onValue: (TextFieldValue) -> Unit, connect: () -> Unit,
+    test: () -> Unit, modelStatus: String, modules: () -> Unit) {
+    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { Text("Receiver", style = MaterialTheme.typography.titleLarge); Text(s.receiver.orEmpty()) }
+        item { WhisperTextField(value, onValue, "Receiver address", maxBytes = 256, onSearch = connect) }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { OutlinedButton(onClick = test) { Text("Test connection") }; Button(onClick = connect, enabled = !s.loading) { Text("Change receiver") } } }
+        item { Button(onClick = modules) { Text("Modules") } }
+        item { Text("Local speech", style = MaterialTheme.typography.titleLarge); Text(modelStatus); Text("Audio and transcripts stay on this device.") }
+        item { Text("ReBox ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") }
+    }
+}
+@Composable
+fun ModuleManager(s: ControllerState, manage: (String, String) -> Unit, settings: (String) -> Unit, install: (String) -> Unit,
+    pair: (String) -> Unit, revoke: () -> Unit) {
+    var url by rememberSaveable { mutableStateOf("") }
+    var code by rememberSaveable { mutableStateOf("") }
+    var confirm by remember { mutableStateOf<ModuleDescriptor?>(null) }
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
-            Text("Receiver", style = MaterialTheme.typography.titleLarge)
-            Text(s.receiver.orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Module management", style = MaterialTheme.typography.titleLarge)
+            Text(if (s.paired) "Paired with this receiver" else "On the HR54, open Settings → Modules → Pair Android management. Enter its temporary code here.")
+            if (!s.paired) {
+                OutlinedTextField(code, { code = it.take(8) }, label = { Text("Pairing code") }, singleLine = true)
+                Button(onClick = { pair(code) }, enabled = !s.busy && code.length == 8) { Text("Pair management") }
+            } else OutlinedButton(onClick = revoke, enabled = !s.busy) { Text("Revoke pairing") }
         }
-        item {
-            WhisperTextField(
-                value,
-                onValue,
-                "Receiver address",
-                maxBytes = 256,
-                onSearch = connect,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(onClick = test) { Text("Test connection") }
-                Button(onClick = connect, enabled = !s.loading) { Text("Change receiver") }
+        items(s.modules, key = { it.id }) { m ->
+            val owned = (s.playback.playing && s.playback.source == m.id) || s.system.nativeModule == m.id
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) { Artwork(moduleAsset(s.receiver, m.id), Modifier.size(40.dp)); Text(m.name, style = MaterialTheme.typography.titleMedium) }
+                    Text(listOf(if (m.core) "Bundled" else "Third-party", m.version, if (!m.installed) "Not installed" else if (!m.enabled) "Disabled" else if (m.healthy) "Enabled" else "Error").filter { it.isNotEmpty() }.joinToString(" · "))
+                    Text(m.error.ifBlank { m.description })
+                    if (m.installed) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { manage(m.id, if (m.enabled) "disable" else "enable") }, enabled = s.paired && !s.busy && !owned && m.compatible) { Text(if (m.enabled) "Disable" else "Enable") }
+                            TextButton(onClick = { confirm = m }, enabled = s.paired && !s.busy && !owned) { Text("Uninstall") }
+                        }
+                        if (m.enabled && m.healthy && (m.capabilities.settings)) TextButton(onClick = { settings(m.id) }) { Text("Module settings") }
+                    } else if (m.core) Button(onClick = { manage(m.id, "reinstall") }, enabled = s.paired && !s.busy) { Text("Reinstall bundled module") }
+                }
             }
         }
         item {
-            Text("Local speech", style = MaterialTheme.typography.titleLarge)
-            Text(modelStatus, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                "Bundled base.en · quantized Q5_1 · English\nAudio and transcripts stay on this device.",
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-        if (s.capabilities.jellyfin && s.auth.authenticated)
-            item { OutlinedButton(onClick = logout) { Text("Sign out of Jellyfin") } }
-        item {
-            Text(
-                "HR54 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${BuildConfig.BUILD_TYPE}",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text("Native television media controller", style = MaterialTheme.typography.bodySmall)
+            Text("Add module from URL", style = MaterialTheme.typography.titleMedium)
+            Text("Modules run executable code on your receiver. Install packages only from sources you trust.")
+            OutlinedTextField(url, { url = truncateUtf8(it, 1024) }, label = { Text("Package URL") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Button(onClick = { install(url) }, enabled = s.paired && !s.busy && url.isNotBlank()) { Text("Install module") }
         }
     }
+    confirm?.let { m -> AlertDialog(onDismissRequest = { confirm = null }, title = { Text("Uninstall ${m.name}?") }, text = { Text("Its saved data will be kept.") }, confirmButton = { TextButton(onClick = { manage(m.id, "uninstall"); confirm = null }) { Text("Uninstall") } }, dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancel") } }) }
 }
-
-val previewState =
-    ControllerState(
-        receiver = "http://receiver:8130",
-        ready = true,
-        connected = true,
-        capabilities = Capabilities(true, true, true, true, true),
-        playback =
-            Playback(
-                true,
-                "jellyfin",
-                title = "Alien",
-                itemId = "alien",
-                elapsed = 1394.0,
-                transport = Transport(true, true, true, true),
-            ),
-        auth = Auth(true),
-        items =
-            listOf(
-                Item("alien", "Alien", "Movie", 1979, 70200000000, playable = true),
-                Item("arrival", "Arrival", "Movie", 2016, playable = true),
-            ),
-        channels =
-            listOf(
-                Channel("ch-1", "BBC World News", group = "News"),
-                Channel("ch-2", "Discovery", group = "Entertainment"),
-            ),
-        groups = listOf(Group("News", 32), Group("Sports", 64)),
-        videos = listOf(Video("jNQXAC9IVRw", "Me at the zoo", "jawed", 19.0)),
-        cameras =
-            listOf(
-                Camera("driveway", "Driveway", playable = true),
-                Camera("porch", "Front porch", reason = "H.264 restream unavailable"),
-            ),
-    )
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 800)
 @Composable
-fun HomePreview() {
-    Hr54Theme { Surface { HomeScreen(previewState, {}, { _, _ -> }, {}) } }
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 800)
-@Composable
-fun JellyfinPreview() {
-    Hr54Theme { Surface { JellyfinScreen(previewState, TextFieldValue(""), {}, {}, {}, {}, {}) } }
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 800)
-@Composable
-fun IptvPreview() {
-    Hr54Theme {
-        Surface { IptvScreen(previewState, TextFieldValue(""), {}, {}, {}, {}, {}, false) }
-    }
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 800)
-@Composable
-fun YoutubePreview() {
-    Hr54Theme {
-        Surface { YoutubeScreen(previewState, TextFieldValue("wildlife"), {}, {}, {}, {}) }
-    }
-}
-
-@Preview(showBackground = true, widthDp = 412, heightDp = 800)
-@Composable
-fun CamerasPreview() {
-    Hr54Theme { Surface { CamerasScreen(previewState, {}) } }
-}
-
-@Preview(showBackground = true, widthDp = 412)
-@Composable
-fun NowPlayingPreview() {
-    Hr54Theme {
-        Surface {
-            NowPlayingContent(
-                previewState.playback,
-                previewState.receiver,
-                7020.0,
-                false,
-                { _, _ -> },
-                {},
-            )
+fun ModuleSettingsScreen(s: ControllerState, save: (ModuleField, JsonPrimitive) -> Unit, action: (String) -> Unit) {
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (!s.paired) item { Text("Pair module management in Settings → Modules to save settings or run actions.") }
+        items(s.settings.fields, key = { it.key }) { field ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(field.label, style = MaterialTheme.typography.titleMedium)
+                when (field.type) {
+                    "bool" -> Switch(field.value.booleanOrNull == true, { save(field, JsonPrimitive(it)) }, enabled = s.paired && !s.busy)
+                    "choice" -> field.choices.forEach { choice -> Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(field.value == choice.value, { save(field, choice.value) }, enabled = s.paired && !s.busy); Text(choice.label) } }
+                    else -> {
+                        var edit by rememberSaveable(s.managedModule, field.key, field.value.content) { mutableStateOf(field.value.content) }
+                        OutlinedTextField(edit, { edit = truncateUtf8(it, 255) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        val value = if (field.type == "integer") edit.toLongOrNull()?.let(::JsonPrimitive) else JsonPrimitive(edit)
+                        Button(onClick = { value?.let { save(field, it) } }, enabled = value != null && s.paired && !s.busy) { Text("Save ${field.label}") }
+                    }
+                }
+            }
         }
+        items(s.settings.actions, key = { it.id }) { Button(onClick = { action(it.id) }, enabled = s.paired && !s.busy) { Text(it.label) } }
+        if (s.settings.fields.isEmpty() && s.settings.actions.isEmpty() && !s.loading) item { Text("No settings available") }
     }
 }
+val previewState = ControllerState(receiver = null, ready = true, connected = true,
+    modules = listOf(ModuleDescriptor("example-media", "Example media", installed = true, enabled = true, healthy = true, capabilities = ModuleCapabilities(browse = true, search = true, playback = true)), ModuleDescriptor("example-app", "Example app", kind = "native-app", installed = true, enabled = true, healthy = true, capabilities = ModuleCapabilities(nativeApp = true))),
+    activeModule = "example-media", page = MediaPage(listOf(MediaItem("folder", "Collection", "folder"), MediaItem("item", "A media item", playable = true)), 2),
+    playback = Playback(playing = true, source = "example-media", title = "A media item", itemId = "item", elapsed = 20.0, transport = Transport(true, true, true, true)))
+@Preview(showBackground = true) @Composable fun HomePreview() { Hr54Theme { Surface { HomeScreen(previewState, {}, { _, _ -> }, {}) } } }

@@ -71,7 +71,7 @@ object AppIcons {
             close()
         }
     val SmartDisplay =
-        icon("YouTube") {
+        icon("Smart display") {
             box(2f, 5f, 22f, 19f)
             moveTo(10f, 9f)
             lineTo(16f, 12f)

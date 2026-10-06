@@ -71,41 +71,10 @@ class PreviewRenderTest {
             }
         }
 
-    @Test
-    fun jellyfin() =
-        render("jellyfin") {
-            Column {
-                Hr54TopBar("Jellyfin", true, {}, {})
-                JellyfinScreen(previewState, TextFieldValue(), {}, {}, {}, {}, {})
-            }
-        }
-
-    @Test
-    fun iptv() =
-        render("iptv") {
-            Column {
-                Hr54TopBar("Live TV", true, {}, {})
-                IptvScreen(previewState, TextFieldValue(), {}, {}, {}, {}, {}, false)
-            }
-        }
-
-    @Test
-    fun youtube() =
-        render("youtube") {
-            Column {
-                Hr54TopBar("YouTube", true, {}, {})
-                YoutubeScreen(previewState, TextFieldValue("wildlife"), {}, {}, {}, {})
-            }
-        }
-
-    @Test
-    fun cameras() =
-        render("cameras") {
-            Column {
-                Hr54TopBar("Cameras", true, {}, {})
-                CamerasScreen(previewState, {})
-            }
-        }
+    @Test fun module() = render("module") {
+        Column { Hr54TopBar("Example module", true, {}, {}); ModuleScreen(previewState, TextFieldValue(), {}, {}, {}, {}, {}, {}, {}) }
+    }
+    @Test fun modules() = render("modules") { ModuleManager(previewState, { _, _ -> }, {}, {}, {}, {}) }
 
     @Test
     fun nowPlaying() =

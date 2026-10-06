@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import androidx.compose.ui.platform.LocalContext
 import com.hr54.controller.data.model.*
 
@@ -69,27 +70,9 @@ fun Hr54Theme(content: @Composable () -> Unit) {
     )
 }
 
-fun sourceLabel(source: String?) =
-    when (source) {
-        "jellyfin" -> "Jellyfin"
-        "iptv" -> "Live TV"
-        "youtube" -> "YouTube"
-        "frigate" -> "Cameras"
-        else -> source.orEmpty()
-    }
-
-fun sourceIcon(name: String) =
-    when (name) {
-        "Jellyfin",
-        "jellyfin" -> AppIcons.Movie
-        "Live TV",
-        "iptv" -> AppIcons.LiveTv
-        "YouTube",
-        "youtube" -> AppIcons.SmartDisplay
-        "Cameras",
-        "frigate" -> AppIcons.Videocam
-        else -> AppIcons.Home
-    }
+val LocalModules = staticCompositionLocalOf<List<ModuleDescriptor>> { emptyList() }
+val LocalMediaPage = staticCompositionLocalOf<Pair<String?, List<MediaItem>>> { null to emptyList() }
+@Composable fun sourceLabel(source: String?) = LocalModules.current.find { it.id == source }?.name ?: source.orEmpty()
 
 @Composable
 fun ConnectionIndicator(connected: Boolean, retry: () -> Unit) {
@@ -133,7 +116,7 @@ fun SourceCard(name: String, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(sourceIcon(name), null, tint = MaterialTheme.colorScheme.primary)
+            Icon(AppIcons.Movie, null, tint = MaterialTheme.colorScheme.primary)
             Text(name, style = MaterialTheme.typography.titleMedium)
         }
     }
@@ -144,8 +127,13 @@ fun Artwork(url: String?, modifier: Modifier = Modifier, description: String? = 
     val context = LocalContext.current
     val inspection = androidx.compose.ui.platform.LocalInspectionMode.current
     val motionEnabled = rememberCoroutineScope().coroutineContext[MotionDurationScale]?.scaleFactor != 0f
-    val request = remember(url, context, inspection, motionEnabled) {
-        ImageRequest.Builder(context).data(if (inspection) null else url).crossfade(if (motionEnabled) 120 else 0).build()
+    val segments = url?.toHttpUrlOrNull()?.pathSegments.orEmpty()
+    val id = segments.getOrNull(2).takeIf { segments.take(2) == listOf("api", "modules") }
+    val version = LocalModules.current.find { it.id == id }?.version.orEmpty()
+    val request = remember(url, version, context, inspection, motionEnabled) {
+        ImageRequest.Builder(context).data(if (inspection) null else url).size(512)
+            .memoryCacheKey("${version.length}:$version:$url").diskCacheKey("${version.length}:$version:$url")
+            .crossfade(if (motionEnabled) 120 else 0).build()
     }
     SubcomposeAsyncImage(
         model = request,
@@ -161,71 +149,6 @@ fun Artwork(url: String?, modifier: Modifier = Modifier, description: String? = 
 private fun ArtPlaceholder() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Icon(AppIcons.Movie, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
-fun MediaPosterCard(item: Item, base: String?, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    Card(onClick = onClick, interactionSource = interaction, modifier = pressMotion(interaction)) {
-        Artwork(base?.let { "$it/art/${item.id}.jpg" }, Modifier.fillMaxWidth().aspectRatio(2f / 3))
-        Column(Modifier.padding(10.dp)) {
-            Text(item.name, maxLines = 2, style = MaterialTheme.typography.titleSmall)
-            Text(
-                if (item.isFolder) "Collection · ${item.childCount ?: "Browse"}"
-                else
-                    listOfNotNull(item.year?.toString(), item.type.takeIf { it.isNotEmpty() })
-                        .joinToString(" · "),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-fun ChannelCard(channel: Channel, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    Card(onClick = onClick, interactionSource = interaction, modifier = Modifier.fillMaxWidth().then(pressMotion(interaction))) {
-        Row(
-            Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Artwork(channel.logo.takeIf { it.isNotBlank() }, Modifier.size(48.dp))
-            Column(Modifier.weight(1f)) {
-                Text(channel.name, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    channel.group,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                "LIVE",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
-    }
-}
-
-@Composable
-fun CameraCard(camera: Camera, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    Card(onClick = onClick, enabled = camera.playable, interactionSource = interaction, modifier = Modifier.fillMaxWidth().then(pressMotion(interaction))) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Icon(AppIcons.Videocam, null, tint = MaterialTheme.colorScheme.primary)
-                Text("LIVE", style = MaterialTheme.typography.labelSmall)
-            }
-            Text(camera.name, style = MaterialTheme.typography.titleMedium)
-            Text(
-                if (camera.playable) "Play on HR54" else camera.reason.ifBlank { "Unavailable" },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
@@ -317,19 +240,11 @@ fun TransportControls(
 
 @Composable
 private fun PlaybackArtwork(playback: Playback, base: String?, modifier: Modifier) {
-    if (playback.source == "jellyfin")
-        Artwork(base?.let { "$it/art/${playback.itemId}.jpg" }, modifier)
-    else
-        Box(
-            modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                sourceIcon(playback.source.orEmpty()),
-                null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
+    val id = playback.source
+    val page = LocalMediaPage.current
+    val key = if (page.first == id) page.second.find { it.id == playback.itemId }?.artwork?.takeIf { it.isNotEmpty() } else null
+    Artwork(if (id != null && moduleId(id)) moduleAsset(base, id, key) else null, modifier)
+
 }
 
 @Composable

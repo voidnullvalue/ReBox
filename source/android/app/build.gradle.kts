@@ -44,6 +44,7 @@ android {
         unitTests.isReturnDefaultValues = true
         unitTests.isIncludeAndroidResources = true
         unitTests.all {
+            it.systemProperty("hr54.repoRoot", rootProject.projectDir.parentFile.parentFile.absolutePath)
             it.systemProperty("hr54.previewDir", rootProject.file("docs/previews").absolutePath)
         }
     }

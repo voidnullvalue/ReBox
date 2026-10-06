@@ -2,389 +2,138 @@ package com.hr54.controller
 
 import com.hr54.controller.data.api.*
 import com.hr54.controller.data.model.*
+import com.hr54.controller.data.repository.ManagementTokenStore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
-import kotlinx.serialization.json.JsonObject
-import org.junit.*
+import kotlinx.serialization.json.*
 import org.junit.Assert.*
+import org.junit.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ViewModelTest {
     private val dispatcher = StandardTestDispatcher()
-
-    @Test
-    fun failedResumeRefreshesDeadPlaybackWithoutLosingError() = runTest(dispatcher) {
-        val fake = FakeReceiverApi().apply { playing = true; source = "jellyfin"; paused = true }
-        val api = object : ReceiverApi {
-            override suspend fun get(path: String, query: Map<String, String>) = fake.get(path, query)
-            override suspend fun post(path: String, body: JsonObject): JsonObject {
-                fake.playing = false
-                fake.source = null
-                throw ReceiverFailure("Jellyfin stream failed before playback became ready", 502)
-            }
-        }
-        val vm = ControllerViewModel(apiFactory = { api })
-        vm.connect("receiver")
-        runCurrent()
-        vm.transport("resume")
-        runCurrent()
-        assertFalse(vm.state.value.playback.playing)
-        assertFalse(vm.state.value.playback.transport.stop)
-        assertEquals("Jellyfin stream failed before playback became ready", vm.state.value.message)
+    @Before fun setup() { Dispatchers.setMain(dispatcher) }
+    @After fun teardown() { Dispatchers.resetMain() }
+    private class Tokens : ManagementTokenStore {
+        val saved = mutableMapOf<String, String>()
+        override suspend fun read(receiver: String) = saved[receiver]
+        override suspend fun write(receiver: String, token: String?) { if (token == null) saved.remove(receiver) else saved[receiver] = token }
+    }
+    @Test fun unknownModuleBrowseSearchPlaybackAndLifecycleWithoutReconnect() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val id = "future-" + java.util.UUID.randomUUID().toString().take(12)
+        api.modules[0] = api.modules[0].copy(id = id)
+        val tokens = Tokens(); val vm = ControllerViewModel(apiFactory = { api }, tokens = tokens)
+        vm.connect("receiver"); runCurrent(); assertTrue(vm.state.value.ready)
+        vm.openModule(id); runCurrent(); assertEquals("Collection", vm.state.value.page.items.first().title)
+        vm.select(vm.state.value.page.items.first()); runCurrent(); assertEquals("folder-a", vm.state.value.cursor.parent)
+        vm.moreItems(); runCurrent(); assertEquals(1, vm.state.value.page.offset)
+        assertEquals("1", api.calls.last { it.first.endsWith("/browse") }.second["offset"])
+        vm.search("test"); runCurrent(); assertEquals("test", vm.state.value.page.items.first().subtitle)
+        vm.play(vm.state.value.page.items.first()); runCurrent(); assertEquals(id, vm.state.value.playback.source)
+        assertEquals("item-0", api.calls.last { it.first.endsWith("/play") }.third!!["itemId"]!!.jsonPrimitive.content)
+        assertTrue(vm.up()); runCurrent(); assertEquals("folder-a", vm.state.value.cursor.parent)
+        assertTrue(vm.up()); runCurrent(); assertEquals("", vm.state.value.cursor.parent)
+        vm.transport("stop"); runCurrent(); vm.pair("abcdef12"); runCurrent(); assertTrue(vm.state.value.paired); assertEquals(api.expectedToken, tokens.saved["http://receiver:8130"])
+        vm.manage(id, "disable"); runCurrent(); assertFalse(vm.state.value.homeModules.any { it.id == id })
+        vm.manage(id, "enable"); runCurrent(); assertTrue(vm.state.value.homeModules.any { it.id == id })
+        vm.manage(id, "uninstall"); runCurrent(); assertFalse(vm.state.value.modules.any { it.id == id })
+        vm.install("http://example.test/new.rbox?x=a&token=2"); runCurrent(); assertTrue(vm.state.value.homeModules.any { it.id == "installed-later" })
+        assertTrue(vm.state.value.ready)
+    }
+    @Test fun searchFirstDoesNotBrowseOrDispatchOnIdentity() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent()
+        vm.openModule("search-first"); runCurrent(); assertFalse(api.calls.any { it.first.contains("search-first/browse") || it.first.contains("search-first/search") })
+        vm.search("😀".repeat(30)); runCurrent(); assertEquals(64, api.calls.last { it.first.endsWith("/search") }.second.getValue("q").toByteArray().size)
+    }
+    @Test fun pairingIsReceiverScopedAnd401RevokesStoredBearer() = runTest(dispatcher) {
+        val tokens = Tokens(); val receivers = mutableMapOf<String, FakeReceiverApi>()
+        val vm = ControllerViewModel(apiFactory = { receivers.getOrPut(it) { FakeReceiverApi() } }, tokens = tokens)
+        vm.connect("first"); runCurrent(); vm.pair("abcdef12"); runCurrent(); assertTrue(vm.state.value.paired)
+        vm.connect("second"); runCurrent(); assertFalse(vm.state.value.paired); assertNull(receivers.getValue("http://second:8130").authorizedToken)
+        vm.connect("first"); runCurrent(); assertTrue(vm.state.value.paired)
+        receivers.getValue("http://first:8130").expectedToken = "b".repeat(64)
+        vm.manage("provider-0", "disable"); runCurrent(); assertFalse(vm.state.value.paired); assertNull(tokens.saved["http://first:8130"])
+        assertTrue(vm.state.value.module("provider-0")!!.enabled)
+    }
+    @Test fun unpairedManagementNeverPostsMutation() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent()
+        vm.manage("provider-0", "uninstall"); runCurrent(); vm.install("https://example.test/new.rbox"); runCurrent()
+        assertFalse(api.calls.any { it.third != null }); assertNotNull(vm.state.value.message)
+    }
+    @Test fun nativeAppUsesGenericLifecycleAndCorePresentation() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent()
+        vm.openModule("native-example"); runCurrent(); vm.nativeApp("native-example", true); runCurrent()
+        assertEquals("native-example", vm.state.value.system.nativeModule)
+        vm.nativeApp("native-example", false); runCurrent(); assertEquals("", vm.state.value.system.nativeModule)
+    }
+    @Test fun unsupportedTransportNeverPostedAndCommandsSerializeFreshState() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent()
+        vm.transport("pause"); runCurrent(); assertFalse(api.calls.any { it.first == "/api/playback/pause" })
+        api.playing = true; api.source = "provider-0"
+        vm.transport("pause"); vm.transport("resume"); vm.transport("seek", delta = 30); runCurrent()
+        assertEquals(listOf("/api/playback/pause", "/api/playback/resume", "/api/playback/seek"), api.calls.filter { it.third != null }.map { it.first })
         assertFalse(vm.state.value.busy)
     }
-
-    @Before
-    fun setup() {
-        Dispatchers.setMain(dispatcher)
+    @Test fun newDaemonInstanceAcceptsLowerGenerationAndStaleSameInstanceIsIgnored() = runTest(dispatcher) {
+        val api = FakeReceiverApi().apply { generation = 50 }; val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent()
+        api.generation = 1; vm.refreshState(); assertEquals(50L, vm.state.value.playback.generation)
+        api.instance = "restarted"; vm.refreshState(); assertEquals(1L, vm.state.value.playback.generation)
+    }
+    @Test fun foregroundPollingStopsInBackgroundAndConnectionFailurePreservesNavigation() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); vm.openModule("provider-0"); runCurrent()
+        api.online = false; vm.refreshState(); assertFalse(vm.state.value.connected); assertEquals("Module", vm.state.value.destination)
+        api.online = true; vm.setForeground(true); runCurrent(); val count = api.calls.size; advanceTimeBy(2001); runCurrent(); assertTrue(api.calls.size > count)
+        vm.setForeground(false); val stopped = api.calls.size; advanceTimeBy(6000); runCurrent(); assertEquals(stopped, api.calls.size)
+    }
+    @Test fun cancelledBrowseDoesNotOverwriteNewModule() = runTest(dispatcher) {
+        val fake = FakeReceiverApi(); val api = object : ReceiverApi by fake {
+            override suspend fun get(path: String, query: Map<String, String>): JsonObject { if (path.endsWith("/browse")) delay(1000); return fake.get(path, query) }
+        }
+        val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); vm.openModule("provider-0"); runCurrent(); vm.openModule("search-first"); advanceTimeBy(1100); runCurrent()
+        assertEquals("search-first", vm.state.value.activeModule); assertTrue(vm.state.value.page.items.isEmpty()); assertFalse(vm.state.value.loading)
+    }
+    @Test fun queuedPlaybackUsesCapturedModuleAndFailedPlaybackRefreshesState() = runTest(dispatcher) {
+        val fake = FakeReceiverApi(); val api = object : ReceiverApi by fake {
+            override suspend fun post(path: String, body: JsonObject): JsonObject { if (path.endsWith("/play")) delay(100); return fake.post(path, body) }
+        }
+        val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); vm.openModule("provider-0"); runCurrent()
+        vm.play(MediaItem("a", "A", playable = true)); vm.openModule("search-first"); vm.play(MediaItem("b", "B", playable = true)); advanceUntilIdle()
+        assertEquals(listOf("/api/modules/provider-0/play", "/api/modules/search-first/play"), fake.calls.filter { it.third != null }.map { it.first })
+        assertEquals("search-first", vm.state.value.playback.source)
+    }
+    @Test fun moduleSettingsAndActionsUsePairingAndPollModuleDeclaredOperation() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); vm.pair("abcdef12"); runCurrent()
+        vm.moduleSettings("provider-0"); runCurrent(); val field = vm.state.value.settings.fields.first(); vm.saveField("provider-0", field, JsonPrimitive(false)); runCurrent(); assertEquals(false, vm.state.value.settings.fields.first().value.boolean)
+        vm.setForeground(true); vm.moduleAction("provider-0", "connect"); runCurrent(); assertEquals("fixture-code", vm.state.value.actionResult!!.code)
+        api.actionApproved = true; advanceTimeBy(2001); runCurrent(); assertTrue(vm.state.value.actionResult!!.authenticated); vm.setForeground(false)
+    }
+    @Test fun zeroAndThirtyTwoModulesDoNotNeedFixedDestinations() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); api.modules.clear(); val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); assertTrue(vm.state.value.homeModules.isEmpty())
+        repeat(32) { api.modules += ModuleDescriptor("module-$it", "Module $it", installed = true, enabled = true, healthy = true) }; vm.refreshModules(); assertEquals(32, vm.state.value.homeModules.size)
     }
 
-    @After
-    fun teardown() {
-        Dispatchers.resetMain()
+    @Test fun exclusiveNativePresentationRequiresLocalShellHandoff() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val m = api.modules.last(); api.modules[api.modules.lastIndex] = m.copy(presentation = Presentation(releaseInput = true, releaseSurface = true))
+        val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); vm.nativeApp(m.id, true); runCurrent()
+        assertFalse(api.calls.any { it.first.endsWith("/native/start") }); assertTrue(vm.state.value.message!!.contains("HR54 remote"))
+        api.nativeModule = m.id; vm.refreshState(); vm.nativeApp(m.id, false); runCurrent(); assertEquals("", vm.state.value.system.nativeModule)
     }
 
-    @Test
-    fun connectionAndDisconnectionPreserveNavigation() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            assertTrue(vm.state.value.ready)
-            vm.destination("Cameras")
-            runCurrent()
-            api.online = false
-            vm.refreshState()
-            assertFalse(vm.state.value.connected)
-            assertEquals("Cameras", vm.state.value.destination)
-            api.online = true
-            vm.refreshState()
-            assertTrue(vm.state.value.connected)
-        }
-
-    @Test
-    fun failedSetupStaysInSetup() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi().apply { online = false }
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            assertFalse(vm.state.value.ready)
-            assertNotNull(vm.state.value.error)
-            assertFalse(vm.state.value.loading)
-        }
-
-    @Test
-    fun jellyfinFolderBackRestoresCachedItems() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.destination("Jellyfin")
-            runCurrent()
-            assertEquals("Movies", vm.state.value.items.first().name)
-            vm.folder(vm.state.value.items.first())
-            runCurrent()
-            vm.folder(vm.state.value.items.last())
-            runCurrent()
-            assertTrue(vm.up())
-            assertEquals("Alien", vm.state.value.items.first().name)
-            assertTrue(vm.up())
-            assertEquals("Movies", vm.state.value.items.first().name)
-            assertFalse(vm.up())
-        }
-
-    @Test
-    fun pagingUsesActualCount() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.destination("Live TV")
-            runCurrent()
-            vm.loadChannels(more = true)
-            runCurrent()
-            assertEquals(2, vm.state.value.channels.size)
-            assertEquals("1", api.calls.last { it.first == "/api/iptv/channels" }.second["offset"])
-        }
-
-    @Test
-    fun youtubePagingAndExplicitSearch() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.destination("YouTube")
-            runCurrent()
-            assertFalse(api.calls.any { it.first == "/api/youtube/search" })
-            vm.searchYoutube("music")
-            runCurrent()
-            vm.searchYoutube(more = true)
-            runCurrent()
-            assertEquals(1, vm.state.value.videoPage)
-            assertEquals(2, vm.state.value.videos.size)
-            assertFalse(vm.state.value.videoMore)
-        }
-
-    @Test
-    fun unsupportedTransportNeverPosted() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.transport("pause")
-            runCurrent()
-            assertFalse(api.calls.any { it.first == "/api/playback/pause" })
-            vm.play(Channel("ch-a", "News"))
-            runCurrent()
-            vm.transport("seek", delta = 30)
-            runCurrent()
-            assertFalse(api.calls.any { it.first == "/api/playback/seek" })
-            vm.transport("stop")
-            runCurrent()
-            assertFalse(vm.state.value.playback.playing)
-        }
-
-    @Test
-    fun playUsesReturnToTv() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.play(Item("alien", "Alien", runtime = 70200000000, playable = true))
-            runCurrent()
-            assertEquals(
-                "true",
-                api.calls.last { it.first == "/api/play" }.third?.get("returnToTv").toString(),
-            )
-            assertEquals(7020.0, vm.state.value.knownDurations["alien"]!!, 0.0)
-        }
-
-    @Test
-    fun foregroundPollingStopsInBackground() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.setForeground(true)
-            runCurrent()
-            val before = api.calls.size
-            advanceTimeBy(2001)
-            runCurrent()
-            assertTrue(api.calls.size > before)
-            vm.setForeground(false)
-            val stopped = api.calls.size
-            advanceTimeBy(6000)
-            runCurrent()
-            assertEquals(stopped, api.calls.size)
-        }
-
-    @Test
-    fun youtubeConflictAutomaticallyStopsAndRetries() = runTest(dispatcher) {
-        val api = FakeReceiverApi().apply { playing = true; source = "jellyfin" }
-        val vm = ControllerViewModel(apiFactory = { api })
-        vm.connect("receiver")
-        runCurrent()
-        vm.searchYoutube("music")
-        runCurrent()
-        assertFalse(api.playing)
-        assertEquals(1, vm.state.value.videos.size)
-        assertNull(vm.state.value.error)
-        val stop = api.calls.indexOfFirst { it.first == "/api/playback/stop" }
-        assertEquals("/api/state", api.calls[stop + 1].first)
-        assertEquals("/api/youtube/search", api.calls[stop + 2].first)
+    @Test fun reversePagingAndFolderReturnKeepActualOffsets() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); vm.openModule("provider-0"); runCurrent(); vm.select(vm.state.value.page.items.first()); runCurrent()
+        vm.moreItems(); runCurrent(); vm.moreItems(); runCurrent(); assertEquals(2, vm.state.value.page.offset)
+        vm.previousPage(); runCurrent(); assertEquals(1, vm.state.value.page.offset)
+        vm.select(MediaItem("nested", "Nested", "folder")); runCurrent(); assertTrue(vm.up()); runCurrent(); assertEquals(1, vm.state.value.page.offset)
+        vm.previousPage(); runCurrent(); assertEquals(0, vm.state.value.page.offset)
     }
-
-    @Test
-    fun everySourceSwitchStopsBeforeStartingSelectedContent() = runTest(dispatcher) {
-        val api = FakeReceiverApi()
-        val vm = ControllerViewModel(apiFactory = { api })
-        vm.connect("receiver")
-        runCurrent()
-        for (source in listOf("iptv", "jellyfin", "youtube", "frigate")) {
-            for (target in listOf("iptv", "jellyfin", "youtube", "frigate")) {
-                api.playing = true
-                api.source = source
-                api.calls.clear()
-                when (target) {
-                    "iptv" -> vm.play(Channel("news", "News"))
-                    "jellyfin" -> vm.play(Item("alien", "Alien", playable = true))
-                    "youtube" -> vm.play(Video("jNQXAC9IVRw", "Zoo"))
-                    "frigate" -> vm.play(Camera("driveway", "Driveway", playable = true))
-                }
-                runCurrent()
-                assertEquals(target, api.source)
-                val posts = api.calls.filter { it.third != null }.map { it.first }
-                assertEquals("/api/playback/stop", posts.first())
-                assertEquals(2, posts.size)
-                assertNull(vm.state.value.message)
-            }
-        }
+    @Test fun bundledModuleReinstallUpdatesRegistryWithoutReconnect() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); api.modules[0] = api.modules[0].copy(core = true, installed = false, enabled = false)
+        val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); vm.pair("abcdef12"); runCurrent(); vm.manage("provider-0", "reinstall"); runCurrent()
+        assertTrue(vm.state.value.module("provider-0")!!.installed); assertTrue(vm.state.value.homeModules.any { it.id == "provider-0" }); assertTrue(vm.state.value.ready)
     }
-
-    @Test
-    fun selectionDuringInFlightPlaybackIsNotDropped() = runTest(dispatcher) {
-        val fake = FakeReceiverApi()
-        val api = object : ReceiverApi {
-            override suspend fun get(path: String, query: Map<String, String>) = fake.get(path, query)
-            override suspend fun post(path: String, body: JsonObject): JsonObject {
-                if (path == "/api/play") delay(1000)
-                return fake.post(path, body)
-            }
-        }
-        val vm = ControllerViewModel(apiFactory = { api })
-        vm.connect("receiver")
-        runCurrent()
-        vm.play(Item("alien", "Alien", playable = true))
-        runCurrent()
-        assertTrue(vm.state.value.busy)
-        vm.play(Channel("news", "News"))
-        advanceUntilIdle()
-        assertEquals("iptv", fake.source)
-        assertEquals(listOf("/api/play", "/api/playback/stop", "/api/iptv/play"),
-            fake.calls.filter { it.third != null }.map { it.first })
+    @Test fun revokedBearerDuringActionPollClearsPairing() = runTest(dispatcher) {
+        val api = FakeReceiverApi(); val tokens = Tokens(); val vm = ControllerViewModel(apiFactory = { api }, tokens = tokens); vm.connect("receiver"); runCurrent(); vm.pair("abcdef12"); runCurrent(); vm.setForeground(true)
+        vm.moduleAction("provider-0", "connect"); runCurrent(); api.expectedToken = "b".repeat(64); advanceTimeBy(2001); runCurrent()
+        assertFalse(vm.state.value.paired); assertNull(tokens.saved["http://receiver:8130"]); vm.setForeground(false)
     }
-
-    @Test
-    fun failedStopDoesNotStartAnotherStream() = runTest(dispatcher) {
-        val fake = FakeReceiverApi().apply { playing = true; source = "iptv" }
-        val api = object : ReceiverApi {
-            override suspend fun get(path: String, query: Map<String, String>) = fake.get(path, query)
-            override suspend fun post(path: String, body: JsonObject): JsonObject {
-                if (path == "/api/playback/stop") throw ReceiverFailure("Stop failed", 502)
-                return fake.post(path, body)
-            }
-        }
-        val vm = ControllerViewModel(apiFactory = { api })
-        vm.connect("receiver")
-        runCurrent()
-        vm.play(Item("alien", "Alien", playable = true))
-        runCurrent()
-        assertEquals("iptv", fake.source)
-        assertFalse(fake.calls.any { it.first == "/api/play" })
-        assertEquals("Stop failed", vm.state.value.message)
-        assertFalse(vm.state.value.busy)
-    }
-
-    @Test
-    fun rapidTransportCommandsAreSerializedAndUseFreshState() = runTest(dispatcher) {
-        val api = FakeReceiverApi()
-        val vm = ControllerViewModel(apiFactory = { api })
-        vm.connect("receiver")
-        runCurrent()
-        api.playing = true
-        api.source = "jellyfin"
-        vm.transport("pause")
-        vm.transport("resume")
-        vm.transport("seek", delta = 30)
-        runCurrent()
-        assertEquals(listOf("/api/playback/pause", "/api/playback/resume", "/api/playback/seek"),
-            api.calls.filter { it.third != null }.map { it.first })
-        assertFalse(vm.state.value.playback.paused)
-        assertFalse(vm.state.value.busy)
-    }
-
-    @Test
-    fun quickConnectPollsAndOpensLibrary() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi().apply { authenticated = false }
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.setForeground(true)
-            vm.destination("Jellyfin")
-            runCurrent()
-            vm.startAuth()
-            runCurrent()
-            assertEquals("482 719", vm.state.value.auth.code)
-            api.authenticated = true
-            advanceTimeBy(2501)
-            runCurrent()
-            assertTrue(vm.state.value.auth.authenticated)
-            assertEquals("Movies", vm.state.value.items.first().name)
-            vm.setForeground(false)
-        }
-
-    @Test
-    fun jellyfinSearchBackReturnsToFolder() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.destination("Jellyfin")
-            runCurrent()
-            vm.folder(vm.state.value.items.first())
-            runCurrent()
-            val folders = vm.state.value.folders
-            vm.searchJellyfin("alien")
-            runCurrent()
-            assertTrue(vm.up())
-            runCurrent()
-            assertEquals(folders, vm.state.value.folders)
-            assertEquals("", vm.state.value.jellyQuery)
-        }
-
-    @Test
-    fun searchFolderBackRestoresSearchThenLibraries() =
-        runTest(dispatcher) {
-            val api = FakeReceiverApi()
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.destination("Jellyfin")
-            runCurrent()
-            vm.searchJellyfin("science")
-            runCurrent()
-            vm.folder(vm.state.value.items.last())
-            runCurrent()
-            assertTrue(vm.up())
-            assertEquals("science", vm.state.value.jellyQuery)
-            assertTrue(vm.up())
-            runCurrent()
-            assertEquals("Movies", vm.state.value.items.first().name)
-            assertFalse(vm.up())
-        }
-
-    @Test
-    fun youtubeNeverRequestsPastServerPageLimit() =
-        runTest(dispatcher) {
-            val fake = FakeReceiverApi()
-            val api =
-                object : ReceiverApi {
-                    override suspend fun get(path: String, query: Map<String, String>): JsonObject {
-                        val response = fake.get(path, query)
-                        return if (path == "/api/youtube/search")
-                            JsonObject(
-                                response +
-                                    ("hasMore" to kotlinx.serialization.json.JsonPrimitive(true))
-                            )
-                        else response
-                    }
-
-                    override suspend fun post(path: String, body: JsonObject) =
-                        fake.post(path, body)
-                }
-            val vm = ControllerViewModel(apiFactory = { api })
-            vm.connect("receiver")
-            runCurrent()
-            vm.searchYoutube("music")
-            runCurrent()
-            repeat(100) {
-                vm.searchYoutube(more = true)
-                runCurrent()
-            }
-            assertEquals(100, vm.state.value.videoPage)
-            assertFalse(vm.state.value.videoMore)
-            vm.searchYoutube(more = true)
-            runCurrent()
-            assertEquals(101, fake.calls.count { it.first == "/api/youtube/search" })
-        }
 }

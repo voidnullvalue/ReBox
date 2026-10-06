@@ -397,3 +397,39 @@ the current generic shell also cross-compiles. These are not physical EGL,
 RF remote, Doom graphics/audio, or receiver boot acceptance. The core static
 MIPS binary builds, but its full build script still cannot link module-fetch
 because extracted vendor libcurl.so.4.4.0 is missing.
+
+## Android runtime-controller checkpoint
+
+Android now discovers descriptors from `/api/modules`. Home cards, icons,
+folders, search-first screens, artwork, paging, playback and module-defined
+settings/actions use runtime IDs and capabilities. Only Home/Settings and generic
+module/manager screens are fixed destinations. There are no provider switches
+or provider-specific timeouts in production Android code. One active media page
+and bounded cursor history replace separate provider states.
+
+Management uses pairing, not receiver-local secrets. The app stores receiver-
+scoped bearers atomically, mode 0600, under private no-backup storage. Only
+protected mutation requests receive the bearer; redirects are refused. A 401
+clears pairing, including during action polling. Enable/disable/uninstall,
+bundled reinstall, URL install and settings/actions refresh runtime state without
+reconnecting. The original receiver-address preference and local speech remain.
+
+Native-app presentation flags are enforced: apps requiring input/surface release
+launch through the receiver shell and can be stopped from Android. Generic
+remote launch is available only when neither release is required. The existing
+core lacks a remote exclusive-handoff acknowledgement, and the app does not
+bypass that ownership requirement.
+
+Validation uses `:app:testDebugUnitTest`, `:app:assembleDebug`,
+`:app:compileDebugAndroidTestKotlin` and `:app:lintDebug`. Host tests include real
+core/installer/Unix-socket module processes: a package ID generated after client
+compilation is paired, installed, discovered, browsed/searched/played, disabled,
+re-enabled and uninstalled through the production Android client/view model.
+The receiver decoder is mocked. Compose host renders and token-storage tests
+also run; instrumented sources compile but must still execute on a device.
+
+The debug APK includes the real ARM64 Whisper native build. Receiver production
+startup/bundles still require packaging work. Real media decoding, exclusive
+native presentation, phone LAN / microphone permissions and on-device speech
+remain physical acceptance work.
+See `source/android/README.md` for the client workflow and build commands.

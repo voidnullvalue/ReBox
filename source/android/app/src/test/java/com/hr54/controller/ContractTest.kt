@@ -3,6 +3,7 @@ package com.hr54.controller
 import com.hr54.controller.data.api.*
 import com.hr54.controller.data.model.*
 import kotlinx.serialization.json.*
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -35,15 +36,6 @@ class ContractTest {
     }
 
     @Test
-    fun capabilities() {
-        val caps =
-            apiJson.decodeFromString<Capabilities>(
-                """{"ok":true,"jellyfin":true,"youtube":false,"doom":false}"""
-            )
-        assertEquals(listOf("Home", "Jellyfin"), caps.destinations())
-    }
-
-    @Test
     fun parseStateAndTransport() {
         val p =
             apiJson.decodeFromString<Playback>(
@@ -53,28 +45,6 @@ class ContractTest {
         assertFalse(p.transport.pause)
         assertFalse(p.transport.seek)
         assertNull(p.duration)
-    }
-
-    @Test
-    fun parseRuntimeTicks() {
-        val item =
-            apiJson.decodeFromString<Item>(
-                """{"id":"a","name":"Alien","runtime":70200000000,"year":1979,"childCount":null}"""
-            )
-        assertEquals(7020.0, item.seconds!!, 0.0)
-    }
-
-    @Test
-    fun parsePaging() {
-        val channels =
-            apiJson.decodeFromString<Channels>(
-                """{"channels":[],"total":121,"offset":60,"limit":60,"hasMore":true}"""
-            )
-        assertTrue(channels.hasMore)
-        assertEquals(60, channels.offset)
-        val videos = apiJson.decodeFromString<Videos>("""{"page":2,"hasMore":false,"results":[]}""")
-        assertEquals(2, videos.page)
-        assertFalse(videos.hasMore)
     }
 
     @Test
@@ -118,15 +88,6 @@ class ContractTest {
     }
 
     @Test
-    fun thumbnailsValidateIds() {
-        assertNull(Video("../../foo", "title").thumbnail)
-        assertEquals(
-            "https://i.ytimg.com/vi/jNQXAC9IVRw/hqdefault.jpg",
-            Video("jNQXAC9IVRw", "title").thumbnail,
-        )
-    }
-
-    @Test
     fun insertionDoesNotSplitSurrogates() {
         assertEquals(InsertedText("hi😀", 2), insertTranscript("😀", 1, 1, "hi"))
     }
@@ -139,5 +100,28 @@ class ContractTest {
             assertEquals(normalized, normalizeReceiver(normalized))
         }
         assertEquals("http://[fd00::1]:8130", normalizeReceiver("[fd00::1]"))
+    }
+
+    @Test fun registryAcceptsRuntimeIdsAndRejectsExcessOrDuplicates() {
+        val module = ModuleDescriptor("future.radio-1", "Radio", installed = true, enabled = true, healthy = true)
+        assertEquals(module, ModuleRegistry(1, listOf(module)).validated().modules.first())
+        for (registry in listOf(ModuleRegistry(2), ModuleRegistry(1, List(33) { module.copy(id = "id-$it") }), ModuleRegistry(1, listOf(module, module)), ModuleRegistry(1, listOf(module.copy(id = "../bad"))))) {
+            try { registry.validated(); fail("Invalid registry accepted") } catch (_: IllegalArgumentException) {}
+        }
+    }
+    @Test fun genericArtworkEncodesOpaqueIdsAndNeverChangesAuthority() {
+        val url = moduleAsset("http://receiver:8130", "future.radio-1", "a/b ?#&")!!
+        assertTrue(url.startsWith("http://receiver:8130/api/modules/future.radio-1/art/"))
+        assertEquals("a/b ?#&", url.toHttpUrl().pathSegments.last())
+        assertNull(url.toHttpUrl().query)
+        assertNull(url.toHttpUrl().fragment)
+    }
+    @Test fun mediaAndSettingsAreBounded() {
+        val row = MediaItem("opaque", "A title", playable = true)
+        assertEquals(row, MediaPage(listOf(row)).validated().items.first())
+        try { MediaPage(List(61) { row }).validated(); fail() } catch (_: IllegalArgumentException) {}
+        try { MediaPage(hasMore = true).validated(); fail() } catch (_: IllegalArgumentException) {}
+        assertEquals(false, ModuleSettings(listOf(ModuleField("toggle", "Toggle", "bool", JsonPrimitive(false)))).validated().fields.first().value.boolean)
+        try { ModuleSettings(listOf(ModuleField("bad", "Bad", "choice", JsonPrimitive("x")))).validated(); fail() } catch (_: IllegalArgumentException) {}
     }
 }
