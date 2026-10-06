@@ -3,7 +3,7 @@
 import sys,json,re,os,pathlib,fcntl,resource
 resource.setrlimit(resource.RLIMIT_AS,(128*1024*1024,128*1024*1024))
 resource.setrlimit(resource.RLIMIT_CPU,(50,50))
-BASE=pathlib.Path('/var/hr54-persist/jellyfin/youtube')
+BASE=pathlib.Path(os.environ.get('REBOX_YOUTUBE_RUNTIME','/var/hr54-persist/jellyfin/youtube'))
 _lock=open(BASE/'update.lock','a');fcntl.flock(_lock,fcntl.LOCK_SH)
 sys.path.insert(0,str(BASE/'yt-dlp.zip'))
 from yt_dlp import YoutubeDL

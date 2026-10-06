@@ -296,3 +296,39 @@ receiver boot. Production artifacts/checksums have not been replaced.
 The historical 2,096-channel parser comparison could not run: its source
 playlist is absent, and the distribution playlist is a different fixture.
 The new local playlist tests cover metadata, stable IDs, groups and reload.
+
+## YouTube migration checkpoint
+
+`modules/youtube` owns the resolver facade, idle updater, URL validation, worker
+lifecycle, remux relay and saved search state. Its manifest declares browse=false
+and search=true; no client ID check opens search. Generic pagination translates
+opaque results into item/title/subtitle/duration fields. Playback preparation
+returns an inert moduleProxy stream plan with Stop only. The module retains the
+startup/drain hold and one fresh signed-URL resolution before any stream bytes.
+Core alone owns decoder commands and session arbitration.
+
+The receiver initially retains `jellyfin/youtube` runtime/cookies and
+`state/youtube-state.json` without moving/deleting files. Resolver/updater/relay
+sources have moved into the module; transitional runtime builds reference them.
+The Python tools take an explicit runtime directory from the module process;
+the updater checks generic core ready/mediaBusy state rather than checking a
+fixed list of services. Automatic updates are a persisted module setting,
+protected through the generic settings API. Missing resolver/upstream failure
+never prevents module/core health readiness.
+
+Legacy `/api/youtube/{search,status,state,play,stop}` routes delegate to module
+RPC and core playback. The play adapter translates videoId. Legacy Stop can
+cancel search or playback preparation without waiting for the operation lock.
+The old daemon temporarily includes this module-owned implementation for the
+unconverted distribution path. Full runtime package seeding remains packaging
+work; this checkpoint has not replaced receiver payload assets.
+
+Validation: core tests now include resolver subprocesses, normalized search,
+legacy state, invalid IDs, stream bytes, preparation/search cancellation,
+settings authorization/persistence and missing-runtime readiness. The real
+native UI opens search from the manifest, types through its keyboard, browses
+results and plays/stops. The legacy worker integration and exact-PID/FIFO fork
+failure tests pass. `modules/youtube/build-receiver.sh` builds the MIPS module
+and relay; `jellyfin/youtube/build-native.sh` builds runtime helpers and Python
+bytecode. These are fixture/remux/build checks, not actual YouTube decoding or
+physical HR54 acceptance.

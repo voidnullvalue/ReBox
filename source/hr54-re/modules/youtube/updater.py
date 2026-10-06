@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Idle-only receiver updater: official HTTPS, checksum, pyc, smoke, atomic swap."""
 import sys,os,time,json,pathlib,subprocess,hashlib,zipfile,py_compile,tempfile,urllib.request,fcntl,resource,shutil
-BASE=pathlib.Path('/var/hr54-persist/jellyfin/youtube');STAMP=BASE/'update-status.json'
+BASE=pathlib.Path(os.environ.get('REBOX_YOUTUBE_RUNTIME','/var/hr54-persist/jellyfin/youtube'));STAMP=BASE/'update-status.json'
 resource.setrlimit(resource.RLIMIT_AS,(160*1024*1024,160*1024*1024))
 resource.setrlimit(resource.RLIMIT_CPU,(300,300));os.nice(15);os.umask(0o077)
 def state():
- for path,key in [('/api/status','playing'),('/api/iptv/status','active'),('/api/youtube/status','active')]:
-  with urllib.request.urlopen('http://127.0.0.1:8130'+path,timeout=3) as r:
-   if json.load(r).get(key):return False
- return True
+ with urllib.request.urlopen('http://127.0.0.1:8130/api/system/status',timeout=3) as r:
+  status=json.load(r)
+ return status.get('ready') is True and status.get('mediaBusy',True) is False
+
 def fetch(url,cap):
  if not url.startswith('https://'):raise ValueError('HTTPS required')
- cmd=[str(BASE/'bin/exec-guard'),'/var/hr54-persist/jellyfin/bin/hr54-iptv-fetch',url,'/var/hr54-persist/jellyfin/iptv/ca-certificates.crt','HR54-YouTube-Updater/1','','30']
+ cmd=[str(BASE/'bin/exec-guard'),os.environ.get('REBOX_YOUTUBE_FETCH','/var/hr54-persist/jellyfin/bin/hr54-iptv-fetch'),url,os.environ.get('SSL_CERT_FILE','/var/hr54-persist/jellyfin/iptv/ca-certificates.crt'),'HR54-YouTube-Updater/1','','30']
  with subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL) as p:
   for i in range(3):
    if len(p.stdout.readline(8194))>8193:raise ValueError('Invalid fetch header')

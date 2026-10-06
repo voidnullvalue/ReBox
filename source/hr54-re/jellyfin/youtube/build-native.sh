@@ -7,10 +7,12 @@ mkdir -p "$out"
 cp "$here/yt-dlp.sh" "$out/yt-dlp-wrapper"
 cp "$here/yt-dlp.conf" "$out/yt-dlp.conf"
 for helper in relay exec-guard measure; do
- "$zig" cc -target mips-linux-musleabi -mcpu=mips32 -static -O2 -s -o "$out/$helper" "$here/$helper.c"
+ native_source="$here/$helper.c"
+ if [ "$helper" = relay ]; then native_source="$here/../../modules/youtube/relay.c"; fi
+ "$zig" cc -target mips-linux-musleabi -mcpu=mips32 -static -O2 -s -o "$out/$helper" "$native_source"
 done
 python3.14 - "$here" "$out" <<'PY'
 import pathlib,sys,py_compile
 for name in ('resolver','updater'):
- py_compile.compile(str(pathlib.Path(sys.argv[1])/(name+'.py')),cfile=str(pathlib.Path(sys.argv[2])/(name+'.pyc')),dfile=name+'.py',invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+ py_compile.compile(str(pathlib.Path(sys.argv[1])/'../../modules/youtube'/(name+'.py')),cfile=str(pathlib.Path(sys.argv[2])/(name+'.pyc')),dfile=name+'.py',invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
 PY

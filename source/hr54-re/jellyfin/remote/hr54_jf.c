@@ -1793,7 +1793,7 @@ static void serve_art(int fd, const char *method, const char *raw, int native_si
 }
 
 #include "../../modules/iptv/relay.inc"
-#include "hr54_youtube.h"
+#include "../../modules/youtube/runtime.inc"
 
 /* ------------------------------------------------------------------ */
 /* /play/<opaque>.ts relay                                            */
