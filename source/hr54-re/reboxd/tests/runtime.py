@@ -10,7 +10,7 @@ class Runtime(unittest.TestCase):
         state=self.root/'module-state';state.mkdir(exist_ok=True);(state/f'{id}.json').write_text('{"schema":1,"enabled":true}')
     def start(self):
         with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
-        self.url=f'http://127.0.0.1:{port}';self.daemon=subprocess.Popen([str(ROOT/'build/reboxd-host'),str(self.root),str(port),str(self.socketdir)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        self.url=f'http://127.0.0.1:{port}';self.daemon=subprocess.Popen([str(ROOT/'build/reboxd-host'),str(self.root),str(port),str(self.socketdir)],cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         self.addCleanup(self.stop)
         for _ in range(150):
             try:self.get('/api/modules');return

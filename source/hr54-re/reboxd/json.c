@@ -358,8 +358,29 @@ struct jval *jparse_inner(const char **p, const char *end) {
     if (end - *p >= 5 && !strncmp(*p, "false", 5)) { *p += 5; return jnew(J_FALSE); }
     if (end - *p >= 4 && !strncmp(*p, "null", 4)) { *p += 4; return jnew(J_NULL); }
     if (c == '-' || isdigit((unsigned char)c)) {
+        const char *number = *p, *scan = number;
+        if (*scan == '-') scan++;
+        if (scan == end) return NULL;
+        if (*scan == '0') scan++;
+        else {
+            if (*scan < '1' || *scan > '9') return NULL;
+            while (scan < end && *scan >= '0' && *scan <= '9') scan++;
+        }
+        if (scan < end && *scan == '.') {
+            const char *digits = ++scan;
+            while (scan < end && *scan >= '0' && *scan <= '9') scan++;
+            if (digits == scan) return NULL;
+        }
+        if (scan < end && (*scan == 'e' || *scan == 'E')) {
+            scan++;
+            if (scan < end && (*scan == '+' || *scan == '-')) scan++;
+            const char *digits = scan;
+            while (scan < end && *scan >= '0' && *scan <= '9') scan++;
+            if (digits == scan) return NULL;
+        }
+        if (scan < end && !strchr(" ,}\t\r\n]", *scan)) return NULL;
         char *stop = NULL;
-        char *copy = strndup(*p, (size_t)(end - *p));
+        char *copy = strndup(number, (size_t)(scan - number));
         if (!copy) return NULL;
         double d = strtod(copy, &stop);
         size_t used = (size_t)(stop - copy);

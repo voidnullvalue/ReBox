@@ -10,6 +10,9 @@ class Registry(unittest.TestCase):
         m=dict(schema=1,id=id,name='Provider',version='1.0',moduleApi=1,minReboxApi=1,kind='media',entrypoint='bin/module',capabilities={'browse':True})
         m.update(fields);d=self.root/'modules'/id;d.mkdir(parents=True,exist_ok=True);(d/'bin').mkdir(exist_ok=True)
         (d/'bin/module').write_text('executable fixture');(d/'bin/module').chmod(0o700);(d/'module.json').write_text(json.dumps(m));return d
+    def test_pairing_expiration(self):
+        self.run_registry()
+        subprocess.run([str(ROOT/'build/test-auth'),str(self.root)],check=True,capture_output=True)
     def test_empty(self):self.assertEqual(self.run_registry(),[])
     def test_discovery_state_and_permissions(self):
         self.install();m=self.run_registry()[0];self.assertFalse(m['core']);self.assertFalse(m['enabled']);self.assertTrue(m['compatible'])

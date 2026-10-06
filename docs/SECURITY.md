@@ -25,3 +25,10 @@ The package includes necessary vendor plugin/sysroot components. They are not
 declared open source; check redistribution rights before publishing it. Third
 party notices included here do not grant rights to vendor binaries. Do not
 assume this snapshot is a finished publicly redistributable product.
+
+The developing module manager introduces a separate privileged management API.
+**Third-party modules execute receiver-side code and must only be installed from
+trusted sources.** Process separation is not a security sandbox. URL installation
+and enable/disable/uninstall require a management bearer; see
+[the module protocol](MODULES.md#management-authorization-and-install-transaction).
+The shipped legacy payload has not yet been switched to this new daemon.

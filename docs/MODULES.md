@@ -121,3 +121,41 @@ yet been activated by the foundation build.
 Build/check the foundation: `make -C source/hr54-re/reboxd test`.
 The production launch script and accepted payload must be changed only after
 module extraction, compatibility, frontend, and packaging checks pass.
+
+## Management authorization and install transaction
+
+Core creates a random 256-bit `module-state/management.secret` (0600). Trusted
+local UI can read this file to authorize management; ordinary LAN responses
+never return it. A management bearer opens `/api/management/pair/open`, which
+returns an eight-character code valid for 120 seconds and at most five failed
+attempts. `/api/management/pair` exchanges it once for a random persistent bearer.
+The current implementation supports one paired controller: pairing replaces
+and revokes its predecessor. POST `/api/management/revoke` revokes it. Tokens
+are stored 0600 and never logged. Android must store its bearer in private,
+backup-excluded app storage, scoped to its receiver address.
+
+POST `/api/modules/install` takes `url` and optional lowercase `sha256`.
+POST module `/enable`, `/disable`, `/reinstall` and DELETE module require the
+bearer. Read-only discovery remains LAN-visible. Active playback currently
+makes lifecycle mutations return 409; stop it before retrying.
+
+The receiver downloads via a fixed curl helper (TLS verification, HTTP/HTTPS
+only, capped redirects/time/bytes; HTTPS redirects cannot downgrade to HTTP).
+A controlled ustar reader extracts only validated regular files/directories
+into a random staging directory. It rejects links, devices, traversal, duplicates,
+malformed checksums and oversized data. It never invokes tar extraction.
+A supplied digest must match. Replacing a catalog ID additionally requires its
+catalog digest, so another package cannot impersonate the bundled executable.
+
+Before promotion, a durable journal preserves prior state. Live files move to
+an adjacent backup, staged files are renamed into place, and the process must
+pass its `/status` handshake before state is committed. Failure restores files
+and state and restarts the old process. Boot rolls back an interrupted journal
+before serving discovery. Offline reinstall verifies the retained catalog hash.
+Third-party uninstall removes registry state but keeps writable module data.
+
+**Third-party modules execute receiver-side code and must only be installed
+from trusted sources.** They currently inherit ReBox's receiver privileges;
+process separation isolates crashes, not malicious code. Management API is
+privileged. Pairing does not secure the existing root shell/TFTP services or
+provide encryption against a hostile LAN. Use a trusted isolated network.
