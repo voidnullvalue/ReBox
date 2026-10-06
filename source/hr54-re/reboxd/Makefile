@@ -11,13 +11,14 @@ build/registry: tests/registry.c $(LIB) $(wildcard *.h)
 build/reboxd: main.c http.c $(RUNTIME) $(LIB) $(wildcard *.h)
 	mkdir -p build
 	$(CC) $(CFLAGS) -I. -o $@ main.c http.c $(RUNTIME) $(LIB) -lm -pthread
-test: all build/jellyfin-module build/iptv-module build/iptv-fetch build/youtube-module
+test: all build/jellyfin-module build/iptv-module build/iptv-fetch build/youtube-module build/frigate-module
 	python3 tests/foundation.py
 	python3 tests/runtime.py
 	python3 tests/installer.py
 	python3 tests/jellyfin.py
 	python3 tests/iptv.py
 	python3 tests/youtube.py
+	python3 tests/frigate.py
 clean:
 	rm -rf build
 
@@ -52,3 +53,7 @@ build/iptv-fetch: ../modules/iptv/fetch.c
 build/youtube-module: ../modules/youtube/main.c ../modules/youtube/runtime.inc ../modules/shared/sdk.c http.c json.c files.c module_auth.c
 	mkdir -p build
 	$(CC) $(CFLAGS) -DREBOX_HOST_TEST -Wno-unused-function -I. -o $@ ../modules/youtube/main.c ../modules/shared/sdk.c http.c json.c files.c module_auth.c -lm -pthread
+
+build/frigate-module: ../modules/frigate/main.c ../modules/frigate/library.inc ../modules/shared/sdk.c http.c json.c files.c module_auth.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -DREBOX_HOST_TEST -Wno-unused-function -I. -o $@ ../modules/frigate/main.c ../modules/shared/sdk.c http.c json.c files.c module_auth.c -lm -pthread

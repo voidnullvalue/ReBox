@@ -3,9 +3,10 @@
 #include "module_auth.h"
 #include "system.h"
 #include <sys/time.h>
+#include <arpa/inet.h>
 
 typedef struct {
-    char module[64], item[256], title[256], session[256], token[128];
+    char module[64], item[256], title[256], session[256], token[128], url[2048];
     int playing, preparing, paused, live, stop, pause, resume, seek;
     int claimed, opening, cancelled;
     unsigned generation;
@@ -73,8 +74,9 @@ static double elapsed(const Playback *s) {
 static int start_decoder(const Playback *next) {
     pthread_mutex_lock(&decoder_lock);
     if (!current(next->epoch)) goto failed;
-    char url[512];
-    snprintf(url, sizeof url, "http://127.0.0.1:%d/module-stream/%s/%s", listen_port, next->module, next->token);
+    char url[2048];
+    if(*next->url)strcpy(url,next->url);
+    else snprintf(url, sizeof url, "http://127.0.0.1:%d/module-stream/%s/%s", listen_port, next->module, next->token);
     pid_t child = fork();
     if (!child) {
         char *argv[] = {"/var/opt/hr54/bin/hr54-play-url", url, NULL};
@@ -97,7 +99,7 @@ static int start_decoder(const Playback *next) {
     if (!WIFEXITED(status) || WEXITSTATUS(status)) goto failed;
     deadline = mono_now() + 15;
     while (current(next->epoch)) {
-        if (snapshot().claimed) break;
+        if (*next->url || snapshot().claimed) break;
         if (mono_now() > deadline) goto failed;
         nap(.05);
     }
@@ -106,13 +108,28 @@ failed:
     pthread_mutex_unlock(&decoder_lock); return -1;
 }
 #endif
+/* URLs are argv values, never shell fragments. Reject control characters,
+ * credentials and malformed authorities before passing a direct plan on. */
+static int http_url(const char *url) {
+    const char *host=!strncmp(url,"http://",7)?url+7:!strncmp(url,"https://",8)?url+8:NULL;
+    if(!host||!*host)return 0;
+    for(const unsigned char *p=(const unsigned char *)url;*p;p++)if(*p<=32||*p==127)return 0;
+    size_t n=strcspn(host,"/?#");if(!n||n>255)return 0;
+    char authority[256];memcpy(authority,host,n);authority[n]=0;char *port=NULL;
+    if(*authority=='['){char *end=strchr(authority,']');if(!end)return 0;*end=0;unsigned char address[16];if(inet_pton(AF_INET6,authority+1,address)!=1)return 0;if(end[1]){if(end[1]!=':')return 0;port=end+2;}}
+    else{port=strchr(authority,':');if(port)*port++=0;if(!*authority)return 0;for(const unsigned char *p=(unsigned char *)authority;*p;p++)if(!isalnum(*p)&&*p!='.'&&*p!='-')return 0;}
+    if(port){if(!*port)return 0;for(const char *p=port;*p;p++)if(*p<'0'||*p>'9')return 0;char *end;long number=strtol(port,&end,10);if(*end||number<1||number>65535)return 0;}
+    return 1;
+}
 /* A replacement plan is the only way a module may request a decoder restart.
  * Both initial play and transport replacement pass the same validation. */
 static int commit_plan(Playback *next, struct jval *plan, struct sb *out) {
     struct jval *stream = jget(plan, "stream"), *transport = jget(plan, "transport");
     const char *type = jstr(jget(plan, "type")), *kind = jstr(jget(stream, "kind"));
-    if (!type || strcmp(type, "stream") || !kind || strcmp(kind, "moduleProxy") ||
-        safe_string(jget(stream, "token"), next->token, sizeof next->token) || !token_valid(next->token) ||
+    if (!type || strcmp(type, "stream") || !kind ||
+        (strcmp(kind,"moduleProxy")&&strcmp(kind,"http")) ||
+        (!strcmp(kind,"moduleProxy")&&(safe_string(jget(stream,"token"),next->token,sizeof next->token)||!token_valid(next->token))) ||
+        (!strcmp(kind,"http")&&(safe_string(jget(stream,"url"),next->url,sizeof next->url)||!http_url(next->url))) ||
         safe_string(jget(plan, "session"), next->session, sizeof next->session) || !*next->session ||
         safe_string(jget(plan, "title"), next->title, sizeof next->title)) return 502;
     next->stop = jbool(jget(transport, "stop"), 0);
@@ -242,7 +259,7 @@ void rb_stream_proxy(int client, const char *path) {
     memcpy(id, path, n); id[n] = 0; token++;
     pthread_mutex_lock(&playback_lock);
     Playback s = active;
-    int valid = !strcmp(id, s.module) && !strcmp(token, s.token) && !s.opening && !s.claimed && !s.cancelled && (s.playing || s.preparing);
+    int valid = !*s.url && *s.token && !strcmp(id, s.module) && !strcmp(token, s.token) && !s.opening && !s.claimed && !s.cancelled && (s.playing || s.preparing);
     if (valid) active.opening = 1;
     pthread_mutex_unlock(&playback_lock);
     if (!valid) { rb_http_error(client, 404, "expired stream"); return; }

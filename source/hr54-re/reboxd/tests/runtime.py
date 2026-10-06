@@ -33,6 +33,14 @@ class Runtime(unittest.TestCase):
         p=self.get(prefix+'/play',{'itemId':'item-1'});self.assertTrue(p['playing']);self.assertEqual(p['source'],id);self.assertEqual(p['generation'],1)
         self.get('/api/playback/stop',{});self.assertFalse(self.get('/api/state')['playing'])
         self.stop();self.assertEqual(list(self.socketdir.glob('*.sock')),[])
+    def test_direct_http_plans_are_generic_and_validated(self):
+        self.install('future-direct');self.start();prefix='/api/modules/future-direct/play'
+        for url in ['http://127.0.0.1:9999/live.ts?x=a%26b','https://media.example/live','http://[::1]:80/live']:
+            state=self.get(prefix,{'itemId':'opaque','testDirectUrl':url});self.assertTrue(state['playing']);self.assertEqual(state['source'],'future-direct');self.get('/api/playback/stop',{})
+        for url in ['file:///etc/passwd','http://user:secret@host/live','http://host:99999/live','http://host:bad/live','http://host/\r\nInjected: x','http:///missing','http://bad host/live','http://[broken]/live']:
+            with self.assertRaises(urllib.error.HTTPError) as error:self.get(prefix,{'itemId':'opaque','testDirectUrl':url})
+            self.assertEqual(error.exception.code,502);error.exception.close();self.assertFalse(self.get('/api/state')['playing'])
+
     def test_active_module_crash_clears_playback(self):
         self.install();self.start();self.get('/api/modules/test-media/play',{'itemId':'item-1'})
         children=[]

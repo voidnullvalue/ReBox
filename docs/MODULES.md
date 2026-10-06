@@ -332,3 +332,33 @@ failure tests pass. `modules/youtube/build-receiver.sh` builds the MIPS module
 and relay; `jellyfin/youtube/build-native.sh` builds runtime helpers and Python
 bytecode. These are fixture/remux/build checks, not actual YouTube decoding or
 physical HR54 acceptance.
+
+## Frigate migration checkpoint
+
+`modules/frigate` owns its persisted IPv4 host/HTTP port, discovery, configured
+stream selection and H.264 checks. Only normalized camera IDs/names, playback
+availability and generic items leave its private configuration parser. Camera
+URLs/credentials are not sent to clients. Configuration has a two-MiB response
+bound and discovery handles at most 128 cameras. Its status handshake does not
+contact Frigate; an unreachable server leaves core/module readiness intact.
+
+The module prepares a direct `stream.kind=http` plan for the existing Frigate
+web-root `/stream.ts` endpoint. Core now accepts this already documented API 1
+plan variant alongside moduleProxy, validates bounded HTTP/HTTPS URLs and their
+authorities, rejects credentials/control characters/invalid ports, and passes
+URLs as argv values to the fixed receiver player helper. Direct streams do not
+wait for a core proxy claim. Generic module tests with an unknown ID exercise
+this path and invalid plans; there is no provider check in playback code.
+
+Host/port fields use the protected generic settings endpoint and persist in
+module-data/frigate/config.json. The module retains the previous default host
+inside its own implementation. Legacy `/api/frigate/{cameras,status,play,stop}`
+are adapters; the old distribution daemon temporarily includes the same module
+camera implementation. No receiver assets have been replaced.
+
+Core fixture tests cover generic/legacy camera APIs, codec rejection, no leaked
+camera credentials, paging/search, direct playback, configuration authorization
+and persistence, and broken-server readiness. The real generic native UI opens
+ordinary camera items and plays/stops them. The module cross-compiles through
+`modules/frigate/build-receiver.sh`. Real stream/decoder behavior and receiver
+boot remain physical acceptance work.

@@ -27,6 +27,9 @@ static const struct { const char *method, *old, *module, *operation, *rpc_method
     {"GET", "/api/youtube/state", "youtube", "/legacy/state", "GET"},
     {"POST", "/api/youtube/state", "youtube", "/legacy/state", "POST"},
     {"POST", "/api/youtube/play", "youtube", "/play", "POST"},
+    {"GET", "/api/frigate/cameras", "frigate", "/legacy/cameras", "GET"},
+    {"GET", "/api/frigate/status", "frigate", "/legacy/cameras", "GET"},
+    {"POST", "/api/frigate/play", "frigate", "/play", "POST"},
 };
 static int available(const ReboxModule *m) {
     return m && m->installed && m->enabled && m->healthy && m->compatible;
@@ -62,11 +65,12 @@ int rb_compat(int fd, const RbRequest *q, ReboxRegistry *registry) {
             struct sb out = {0}, translated = {0};
             int iptv = !strcmp(path, "/api/iptv/play");
             int youtube = !strcmp(path, "/api/youtube/play");
-            if (iptv || youtube) {
+            int frigate = !strcmp(path, "/api/frigate/play");
+            if (iptv || youtube || frigate) {
                 struct jval *v = json_parse(q->body, q->length);
-                sb_puts(&translated, "{\"itemId\":"); sb_json_str(&translated, jstr(jget(v, iptv ? "channelId" : "videoId"))); sb_puts(&translated, "}"); jfree(v);
+                sb_puts(&translated, "{\"itemId\":"); sb_json_str(&translated, jstr(jget(v, iptv ? "channelId" : youtube ? "videoId" : "cameraId"))); sb_puts(&translated, "}"); jfree(v);
             }
-            int code = rb_play(registry, m, (iptv || youtube) ? translated.p : q->body, &out);
+            int code = rb_play(registry, m, (iptv || youtube || frigate) ? translated.p : q->body, &out);
             if (code == 200 && iptv) {
                 struct jval *v = json_parse(out.p, out.len);
                 out.p[--out.len] = 0; sb_puts(&out, ",\"channelId\":"); sb_json_str(&out, jstr(jget(v, "itemId")));
@@ -88,7 +92,7 @@ int rb_compat(int fd, const RbRequest *q, ReboxRegistry *registry) {
 /* Stop must bypass the long-operation lock so a legacy client can cancel
  * preparation. This adapter never stops another provider's playback. */
 int rb_compat_control(int fd, const RbRequest *q, ReboxRegistry *registry) {
-    const char *id = !strcmp(q->path, "/api/iptv/stop") ? "iptv" : !strcmp(q->path, "/api/youtube/stop") ? "youtube" : NULL;
+    const char *id = !strcmp(q->path, "/api/iptv/stop") ? "iptv" : !strcmp(q->path, "/api/youtube/stop") ? "youtube" : !strcmp(q->path, "/api/frigate/stop") ? "frigate" : NULL;
     if (strcmp(q->method, "POST") || !id) return 0;
     int code = 200; struct sb out = {0};
     if (rb_playback_busy(id)) code = rb_transport(registry, "stop", q->body, &out);
