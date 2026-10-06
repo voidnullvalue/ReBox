@@ -1,6 +1,7 @@
 #ifndef HR54_UI_SCREENS_H
 #define HR54_UI_SCREENS_H
 #include "../apps/state.h"
+void render_module_icon(UiFramebuffer *,App *,const char *,int,int,int,int);
 void render_home(UiFramebuffer *,App *,uint64_t);
 void render_browser(UiFramebuffer *,App *);
 void render_keyboard(UiFramebuffer *,App *);

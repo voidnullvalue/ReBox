@@ -44,12 +44,13 @@ class Backend(http.server.BaseHTTPRequestHandler):
   posted.append(self.path);self.rfile.read(int(self.headers.get("Content-Length","0")));raw=b'{"prepared":true,"dismissedBootAlert":false}';self.send_response(200);self.send_header("Content-Length",str(len(raw)));self.end_headers();self.wfile.write(raw)
  def do_GET(self):
   path=self.path
-  if path.startswith('/api/libraries'):
-   browse_started.set();time.sleep(1.2);data={'libraries':[{'id':'late','name':'Late response'}]}
-  elif path=='/api/system/status':data={'ready':True,'frontend':'native','doomRunning':False}
+  if path.startswith('/api/modules/example-0/browse'):
+   browse_started.set();time.sleep(1.2);data={'items':[{'id':'late','title':'Late response','kind':'item'}], 'total':1,'offset':0,'hasMore':False}
+  elif path=='/api/modules':data={'moduleApi':1,'modules':[{'id':f'example-{i}','name':f'Module {i+1}','version':'1.0','description':'Independent receiver module','installed':True,'enabled':True,'healthy':True,'capabilities':{'browse':True,'search':True,'playback':True}} for i in range(5)]}
+  elif path=='/api/system/status':data={'ready':True,'frontend':'native','nativeModule':'','mediaBusy':False}
   elif path=='/api/auth/status':data={'authenticated':True}
   else:
-   playing=playback_active.is_set();data={'playing':playing,'elapsed':0,'title':'Movie' if playing else '', 'source':'jellyfin' if playing else None,'transport':{}}
+   playing=playback_active.is_set();data={'playing':playing,'elapsed':0,'title':'Movie' if playing else '', 'source':'example-0' if playing else '', 'generation':1 if playing or playback_seen.is_set() else 0,'transport':{}}
    if playing:playback_seen.set()
   raw=json.dumps(data).encode()
   try:self.send_response(200);self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
@@ -57,7 +58,7 @@ class Backend(http.server.BaseHTTPRequestHandler):
 with http.server.ThreadingHTTPServer(('127.0.0.1',0),Backend) as server,tempfile.TemporaryDirectory() as td:
  threading.Thread(target=server.serve_forever,daemon=True).start()
  output=Path(td)/'screen.rgba'
- reference=Path(td)/'home.rgba';subprocess.run([str(root/'build/hr54-ui-host'),'--preview','home-jellyfin','--output',str(reference)],check=True);home=reference.read_bytes()
+ reference=Path(td)/'home.rgba';subprocess.run([str(root/'build/hr54-ui-host'),'--preview','home-five','--output',str(reference)],check=True);home=reference.read_bytes()
  def wait_home(seconds):
   end=time.monotonic()+seconds
   while time.monotonic()<end:

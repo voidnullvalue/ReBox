@@ -1,3 +1,0 @@
-#include "internal.h"
-int api_iptv_groups(ApiClient *a,int offset){char path[160];snprintf(path,sizeof(path),"/api/iptv/groups?offset=%d&limit=%d",offset,offset?60:59);return get(a,API_BROWSE,API_GROUPS,path,10000);}
-int api_iptv_channels(ApiClient *a,const char *group,const char *query,int offset,int exact_group){char g[768],q[256],path[1200];if(api_encode(g,sizeof(g),group)||api_encode(q,sizeof(q),query))return -1;snprintf(path,sizeof(path),"/api/iptv/channels?%s%s%squery=%s&offset=%d&limit=60",exact_group?"group=":"",exact_group?g:"",exact_group?"&":"",q,offset);return get(a,API_BROWSE,API_CHANNELS,path,10000);}

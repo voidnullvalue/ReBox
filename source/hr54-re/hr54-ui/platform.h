@@ -31,5 +31,5 @@ extern int pipe(int *);
 #include <arpa/inet.h>
 #endif
 static inline uint64_t ui_now(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return (uint64_t)t.tv_sec*1000+(unsigned long)t.tv_nsec/1000000; }
-static inline void ui_copy(char *d,size_t n,const char *s) { if(n) snprintf(d,n,"%s",s?s:""); }
+static inline void ui_copy(char *d,size_t n,const char *s) { if(n){if(!s)s="";size_t len=strlen(s);if(len>=n)len=n-1;memmove(d,s,len);d[len]=0;} }
 #endif

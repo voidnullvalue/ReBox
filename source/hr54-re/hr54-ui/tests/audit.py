@@ -5,6 +5,9 @@ import re,subprocess
 root=Path(__file__).resolve().parents[1]
 for path in [root/'main.c',*root.glob('api/*.c'),*root.glob('apps/*.c'),*root.glob('input/*.c'),*root.glob('ui/*.c')]:
  text=path.read_text()
+ # URL entry is data sent to the authenticated core installer, not upstream I/O.
+ if path==root/'apps/controller.c':text=text.replace('"https://"','"HTTPS_PREFIX"')
+ if path==root/'apps/fixtures.c':text=text.replace('"https://example.com/my-module.rbox"','"INSTALL_URL_FIXTURE"')
  # The local UI is a trusted management client. Its sole configuration read is
  # the core-owned private bearer; service configuration remains behind RPC.
  if path==root/'api/client.c':

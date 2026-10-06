@@ -67,6 +67,11 @@ class Installer(runtime.Runtime):
             with self.subTest(key=key,val=val):self.assertEqual(self.install_url(self.archive(manifest={**m,key:val}))[0],400)
         self.assertEqual(self.install_url(self.archive(),'0'*64)[0],400)
         self.assertEqual(self.get('/api/modules')['modules'],[])
+    def test_invalid_icon_bounds(self):
+        self.start();self.auth()
+        m=json.loads((ROOT/'../modules/test-module/module.json').read_text());m['icon']='icon.png'
+        for raw in [b'not png',b'\x89PNG\r\n\x1a\n'+(13).to_bytes(4,'big')+b'IHDR'+(513).to_bytes(4,'big')+(128).to_bytes(4,'big')+b'\0'*20]:
+            self.assertEqual(self.install_url(self.archive(manifest=m,extra=[('icon.png',raw,0o600,'0')]))[0],400)
     def test_failed_update_rolls_back(self):
         self.start();self.auth();self.assertEqual(self.install_url(self.archive())[0],200)
         m=json.loads((ROOT/'../modules/test-module/module.json').read_text());m['version']='2.0';m['entrypoint']='bin/broken'

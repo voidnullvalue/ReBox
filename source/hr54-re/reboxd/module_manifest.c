@@ -56,6 +56,13 @@ static int regular_under(const char *dir,const char *rel,int executable) {
 }
 int rb_module_files(const char *dir,ReboxModule *m) {
     if(regular_under(dir,m->entrypoint,1))return fail("module executable missing or unsafe");
-    if(*m->icon&&regular_under(dir,m->icon,0))return fail("module icon missing or unsafe");
+    if(*m->icon){
+        if(regular_under(dir,m->icon,0))return fail("module icon missing or unsafe");
+        char path[REBOX_PATH_MAX];size_t size=0;rb_path(path,sizeof path,dir,m->icon,NULL);
+        unsigned char *png=(unsigned char *)rb_read(path,512*1024,&size);
+        int valid=png&&size>=33&&!memcmp(png,"\x89PNG\r\n\x1a\n",8)&&!memcmp(png+8,"\0\0\0\15IHDR",8);
+        if(valid){uint32_t w=((uint32_t)png[16]<<24)|((uint32_t)png[17]<<16)|((uint32_t)png[18]<<8)|png[19];uint32_t h=((uint32_t)png[20]<<24)|((uint32_t)png[21]<<16)|((uint32_t)png[22]<<8)|png[23];valid=w&&h&&w<=512&&h<=512;}
+        free(png);if(!valid)return fail("module icon invalid or exceeds limits");
+    }
     return rb_path(m->executable,sizeof m->executable,dir,m->entrypoint,NULL);
 }

@@ -1,3 +1,0 @@
-#include "internal.h"
-int api_jellyfin_libraries(ApiClient *a){return get(a,API_BROWSE,API_LIBRARIES,"/api/libraries",15000);}
-int api_jellyfin_items(ApiClient *a,const char *parent,const char *search,int offset,int resume){char p[512],s[512],path[1400];if(api_encode(p,sizeof(p),parent)||api_encode(s,sizeof(s),search))return -1;if(resume)snprintf(path,sizeof(path),"/api/jellyfin/resume?offset=%d",offset);else snprintf(path,sizeof(path),"/api/items?parent=%s&search=%s&offset=%d&limit=60&videoOnly=%d",p,s,offset,!*parent&&!*search);return get(a,API_BROWSE,resume?API_RESUME:API_ITEMS,path,15000);}

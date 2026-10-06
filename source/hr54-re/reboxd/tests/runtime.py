@@ -33,6 +33,15 @@ class Runtime(unittest.TestCase):
         p=self.get(prefix+'/play',{'itemId':'item-1'});self.assertTrue(p['playing']);self.assertEqual(p['source'],id);self.assertEqual(p['generation'],1)
         self.get('/api/playback/stop',{});self.assertFalse(self.get('/api/state')['playing'])
         self.stop();self.assertEqual(list(self.socketdir.glob('*.sock')),[])
+    def test_active_module_crash_clears_playback(self):
+        self.install();self.start();self.get('/api/modules/test-media/play',{'itemId':'item-1'})
+        children=[]
+        for task in pathlib.Path(f'/proc/{self.daemon.pid}/task').iterdir():children.extend((task/'children').read_text().split())
+        self.assertEqual(len(children),1);os.kill(int(children[0]),9)
+        for _ in range(30):
+            if not self.get('/api/state')['playing']:break
+            time.sleep(.05)
+        self.assertFalse(self.get('/api/state')['playing']);self.assertTrue(self.get('/api/system/status')['ready'])
     def test_crash_containment(self):
         self.install();self.start();children=[]
         for task in pathlib.Path(f'/proc/{self.daemon.pid}/task').iterdir():children.extend((task/'children').read_text().split())

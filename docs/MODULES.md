@@ -206,3 +206,47 @@ exercised against the local Jellyfin fixture. The MIPS core and Jellyfin module
 cross-compile, but the receiver download helper currently cannot link in this
 checkout because the extracted vendor `libcurl.so.4.4.0` is absent. No payload
 binary or distribution checksum has been replaced with an unbuilt artifact.
+
+## Native client checkpoint
+
+Native Home, browsing, search, artwork, and settings now use runtime module
+IDs. Search-first modules open the keyboard based on capabilities. A bounded
+neighbor viewport handles zero through 32 Home entries; disabled modules stay
+in the manager. Settings contains Modules and System/About. Module detail
+supports enable, disable, uninstall while keeping data, offline reinstall,
+module-defined fields/actions, and management pairing. The separate URL entry
+buffer holds 1024 bytes; search keeps its 64-byte limit.
+
+The native client is a trusted local management client. It reads only the
+core's private `module-state/management.secret`, then sends the bearer to the
+loopback core listener. It does not read service configurations. A host-only
+fixture override exists for integration tests and is excluded from receiver
+builds. Android must use pairing instead of this file.
+
+There is one active media page and a 12-entry history of opaque cursors and
+selections. Measured host `App` storage fell from 3,555,432 bytes to about
+191,520 bytes. The eight-entry image cache is shared by module icons and media
+artwork, with one decoder worker. Icons decode to 128×128; existing compressed
+size, dimension, and decoder-allocation caps remain. Home no longer links a
+five-service atlas. Missing/invalid icons use a shell-owned generic symbol.
+
+`/api/system/status` identifies active native presentation through
+`nativeModule` (an empty string when idle). `mediaBusy` remains the conservative
+activation/idle gate: missing busy information is treated as busy. Playback
+state includes an opaque core `instance` so clients can discard old generation
+counters after a daemon restart.
+
+```sh
+HR54_TEST_POLICY="$PWD/receiver/payload/hr54-persist/native-menu/dtv-menu-policy.car" \
+  make -C source/hr54-re/hr54-ui test test-modules
+make -C source/hr54-re/hr54-ui test-module-integration
+python3 source/hr54-re/hr54-ui/tools/previews.py
+```
+
+The integration tests drive the real host frontend, real core, and real Unix
+socket module processes. One types a locally hosted `.rbox` URL through the
+production keyboard, installs an ID generated after compilation, navigates
+folders, searches, plays, disables, re-enables, and uninstalls without restarting
+or rebuilding the frontend. Another exercises Jellyfin browsing, quality
+settings, disconnect/connect and automatic auth-action polling through the
+same generic UI. The decoder is mocked; this is not physical HR54 acceptance.

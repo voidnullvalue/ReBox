@@ -1,5 +1,6 @@
 #include "playback.h"
 #include "module_rpc.h"
+#include "module_auth.h"
 #include "system.h"
 #include <sys/time.h>
 
@@ -17,7 +18,8 @@ static pthread_mutex_t playback_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t decoder_lock = PTHREAD_MUTEX_INITIALIZER;
 static int listen_port = 8130;
 static uint64_t next_epoch;
-void rb_playback_port(int port) { listen_port = port; }
+static char instance[33];
+void rb_playback_port(int port) { listen_port = port; if(rb_random(instance,32))exit(1); }
 static Playback snapshot(void) {
     pthread_mutex_lock(&playback_lock);
     Playback s = active;
@@ -210,9 +212,12 @@ int rb_transport(ReboxRegistry *r, const char *operation, const char *body, stru
     if (rc == 200 && !out->len) rb_playback_json(out);
     return rc;
 }
-void rb_playback_tick(void) {
+void rb_playback_tick(const ReboxRegistry *registry) {
     Playback s = snapshot();
     if (!s.playing || s.preparing) return;
+    const ReboxModule *provider=NULL;
+    for(size_t i=0;i<registry->count;i++)if(!strcmp(registry->modules[i].id,s.module)){provider=&registry->modules[i];break;}
+    if(!provider||provider->pid!=s.provider.pid||!provider->healthy){cancel(s.epoch);stop_decoder(s.epoch);return;}
     RbReply reply;
     if (rb_rpc(&s.provider, "GET", "/status", NULL, &reply, 1)) return;
     struct jval *v = json_parse(reply.body.p, reply.body.len), *p = jget(v, "playback");
@@ -225,7 +230,7 @@ void rb_playback_json(struct sb *out) {
     Playback s = snapshot();
     sb_fmt(out, "{\"ok\":true,\"playing\":%s,\"preparing\":%s,\"paused\":%s,\"live\":%s,\"generation\":%u,\"source\":",
         s.playing ? "true" : "false", s.preparing ? "true" : "false", s.paused ? "true" : "false", s.live ? "true" : "false", s.generation);
-    sb_json_str(out, s.module); sb_puts(out, ",\"itemId\":"); sb_json_str(out, s.playing ? s.item : "");
+    sb_json_str(out, s.module); sb_puts(out, ",\"instance\":"); sb_json_str(out,instance); sb_puts(out, ",\"itemId\":"); sb_json_str(out, s.playing ? s.item : "");
     sb_puts(out, ",\"title\":"); sb_json_str(out, s.playing ? s.title : "");
     sb_fmt(out, ",\"elapsed\":%.0f,\"duration\":%.0f,\"transport\":{\"stop\":%s,\"pause\":%s,\"resume\":%s,\"seek\":%s}}",
         s.playing ? elapsed(&s) : 0, s.playing ? s.duration : 0, s.playing && s.stop ? "true" : "false",

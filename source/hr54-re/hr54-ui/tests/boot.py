@@ -111,7 +111,7 @@ with tempfile.TemporaryDirectory(prefix='hr54-native-supervisor-') as td:
 
 # The real typed health-check CLI fails closed on old/malformed readiness.
 class Readiness(http.server.BaseHTTPRequestHandler):
-    state={'ready':True,'frontend':'native','doomRunning':False,'mediaBusy':False}
+    state={'ready':True,'frontend':'native','nativeModule':'','mediaBusy':False}
     def log_message(self,*args): pass
     def do_GET(self):
         raw=json.dumps(self.state).encode(); self.send_response(200); self.send_header('Content-Length',str(len(raw))); self.end_headers(); self.wfile.write(raw)

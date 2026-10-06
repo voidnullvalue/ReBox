@@ -1,10 +1,8 @@
 #include "image.h"
-#include "icon_data.h"
-/* One scaled image per service: bounded storage, reused while idle. */
-static struct {int size;unsigned char pixels[ICON_SIZE*ICON_SIZE*4];} cache[5];
-void draw_icon(UiFramebuffer *f,int source,int x,int y,int size,int focus){
-    if(source<0||source>=5||size<1||size>ICON_SIZE||x+size<0||x>=f->width)return;
-    if(focus<0)focus=0;if(focus>1000)focus=1000;
-    if(cache[source].size!=size){image_scale(icon_rgba[source],ICON_SIZE,ICON_SIZE,cache[source].pixels,size,size);cache[source].size=size;}
-    image_draw(f,cache[source].pixels,size,size,x,y,105+150*focus/1000);
+/* One scratch image, independent of how many installed modules exist. */
+void draw_icon(UiFramebuffer *f,const unsigned char *pixels,int width,int height,int x,int y,int size,int focus){
+    static unsigned char scaled[128*128*4];
+    if(size<1||size>128||x+size<0||x>=f->width)return;if(focus<0)focus=0;if(focus>1000)focus=1000;
+    if(pixels&&width>0&&height>0){image_scale(pixels,width,height,scaled,size,size);image_draw(f,scaled,size,size,x,y,105+150*focus/1000);}
+    else{draw_round(f,x,y,size,size,size/8,UI_PANEL,UI_PANEL);int gap=size/12,cell=size/4;for(int i=0;i<4;i++)draw_round(f,x+size/4+(i%2)*(cell+gap),y+size/4+(i/2)*(cell+gap),cell,cell,cell/5,UI_MUTED,UI_MUTED);}
 }

@@ -21,42 +21,39 @@ int main(void){
     app_key(toggle,(KeyEvent){input_key(0x1e401),1,0,0x1e401});assert(strstr(toggle->api.r[API_CONTROL].request,"POST /api/playback/resume "));api_cancel(&toggle->api,API_CONTROL);
     key(toggle,KEY_PLAY);assert(strstr(toggle->api.r[API_CONTROL].request,"POST /api/playback/resume "));api_cancel(&toggle->api,API_CONTROL);
     toggle->playback.can_resume=0;key(toggle,KEY_PAUSE);assert(!api_busy(&toggle->api,API_CONTROL));app_free(toggle);free(toggle);
-    /* Physical RC LEFT is also Back. Preserve only real horizontal controls. */
-    App *left=calloc(1,sizeof(*left));assert(left);app_init(left,1);app_fixture(left,"jellyfin-browser");
-    app_key(left,(KeyEvent){KEY_LEFT,1,1,0x1e102});assert(left->screen==SCREEN_BROWSER);key(left,KEY_LEFT);assert(left->screen==SCREEN_HOME);
-    app_fixture(left,"jellyfin-browser");key(left,KEY_SELECT);assert(left->screen==SCREEN_DETAILS);key(left,KEY_LEFT);assert(left->screen==SCREEN_BROWSER);
-    left->screen=SCREEN_PAIR;key(left,KEY_LEFT);assert(left->screen==SCREEN_HOME);
-    left->screen=SCREEN_SETTINGS;left->settings_focus=1;key(left,KEY_LEFT);assert(left->screen==SCREEN_HOME);
-    left->screen=SCREEN_PLAYER;left->playback.playing=1;key(left,KEY_LEFT);assert(left->screen==SCREEN_HIDDEN);
-    left->screen=SCREEN_SETTINGS;left->settings_focus=0;left->quality_count=2;left->quality_rates[0]=1000;left->quality_rates[1]=2000;left->bitrate=2000;key(left,KEY_LEFT);assert(left->screen==SCREEN_SETTINGS&&left->bitrate==1000);
-    left->screen=SCREEN_KEYBOARD;left->keyboard_focus=10;key(left,KEY_LEFT);assert(left->screen==SCREEN_KEYBOARD&&left->keyboard_focus==9);
-    left->screen=SCREEN_HOME;left->home=0;key(left,KEY_LEFT);assert(left->screen==SCREEN_HOME&&left->home==4);app_free(left);free(left);
-    App *app=calloc(1,sizeof(*app));assert(app);app_init(app,1);reply(app,API_READY,"{\"ready\":true,\"frontend\":\"native\",\"doomRunning\":false}");assert(app->screen==SCREEN_HOME&&!app->frontend_prepared);reply(app,API_PREPARE,"{\"prepared\":true}");assert(app->frontend_prepared);key(app,KEY_RIGHT);assert(app->home==1);key(app,KEY_LEFT);assert(app->home==0);key(app,KEY_RIGHT);key(app,KEY_RIGHT);key(app,KEY_RIGHT);key(app,KEY_RIGHT);assert(app->home==4);key(app,KEY_RIGHT);assert(app->home==0);
-    app_fixture(app,"jellyfin-browser");BrowseNode *node=app_node(app);node->selection=3;key(app,KEY_SELECT);assert(app->screen==SCREEN_DETAILS);key(app,KEY_GUIDE);assert(app->screen==SCREEN_HOME&&node->selection==3);key(app,KEY_SELECT);assert(app->screen==SCREEN_BROWSER&&node->selection==3);key(app,KEY_SELECT);assert(app->screen==SCREEN_DETAILS);key(app,KEY_BACK);assert(app->screen==SCREEN_BROWSER);
-    unsigned stale=app->api.generation;key(app,KEY_GUIDE);ApiResponse response={API_ITEMS,API_OK,stale,200,(const unsigned char *)"{\"items\":[]}",12};app_response(app,&response);assert(node->list.count==6&&app->screen==SCREEN_HOME);
-    app->source=SOURCE_YOUTUBE;app->screen=SCREEN_KEYBOARD;app->query[0]=0;app->keyboard_focus=0;key(app,KEY_SELECT);assert(!strcmp(app->query,"a"));app->keyboard_focus=41;key(app,KEY_SELECT);assert(!strcmp(app->query,"a "));key(app,KEY_BACK);assert(!strcmp(app->query,"a"));app->keyboard_focus=43;key(app,KEY_SELECT);assert(!*app->query);
-    app->screen=SCREEN_HOME;app->playback=(PlaybackState){0};app->dirty=0;reply(app,API_STATE,"{\"playing\":false,\"elapsed\":0,\"title\":\"\",\"source\":null,\"transport\":{}}");assert(!app->dirty);reply(app,API_STATE,"{\"playing\":true,\"elapsed\":10,\"title\":\"Movie\",\"source\":\"jellyfin\",\"transport\":{\"pause\":true}}");assert(app->dirty&&app->playback.can_pause);
-    ApiResponse state_timeout={API_STATE,API_TIMEOUT,app->api.generation,0,NULL,0};app->notice[0]=0;app_response(app,&state_timeout);assert(!app->notice[0]&&app->status_failures==1);reply(app,API_STATE,"{\"playing\":true,\"elapsed\":11,\"title\":\"Movie\",\"source\":\"jellyfin\",\"transport\":{\"pause\":true}}");assert(!app->status_failures);
-    app->screen=SCREEN_HOME;app->awaiting=API_PLAY;reply(app,API_PLAY,"{\"playing\":true}");assert(app->screen==SCREEN_HOME);/* GUIDE while preparing must stay visible. */
-    app->screen=SCREEN_HOME;app->playback.playing=0;key(app,KEY_BACK);assert(app->screen==SCREEN_HOME);ApiResponse exit_failure={API_EXIT,API_UNAVAILABLE,app->api.generation,0,NULL,0};app_response(app,&exit_failure);assert(app->screen==SCREEN_HOME);key(app,KEY_EXIT);assert(app->screen==SCREEN_HOME);key(app,KEY_MENU);assert(app->screen==SCREEN_HOME&&!app->frontend_prepared);/* Idle native exit never exposes the underlying stock surface. */
-    Artwork art={0};ui_copy(art.pending,sizeof(art.pending),"bad");assert(artwork_accept(&art,(const unsigned char *)"garbage",7,1)<0);assert(artwork_find(&art,"bad")->failed);artwork_free(&art);
-    app_free(app);app_init(app,1);reply(app,API_READY,"{\"ready\":true,\"frontend\":\"native\",\"doomRunning\":true}");assert(app->doom_running&&app->screen==SCREEN_DOOM&&app->home==4);reply(app,API_DOOM_STATUS,"{\"running\":false,\"native\":true}");assert(app->screen==SCREEN_HOME&&!app->doom_running);
-    app->source=SOURCE_IPTV;app->screen=SCREEN_BROWSER;reply(app,API_GROUPS,"{\"groups\":[{\"name\":\"News\",\"label\":\"News\"},{\"name\":\"\",\"label\":\"Other channels\"}],\"groupCount\":2}");node=app_node(app);assert(node->list.count==3&&node->list.item[0].virtual_entry);key(app,KEY_SELECT);assert(app_node(app)->kind==BROWSE_ITEMS&&!strstr(app->api.r[API_BROWSE].request,"group="));key(app,KEY_BACK);node->selection=1;key(app,KEY_SELECT);assert(strstr(app->api.r[API_BROWSE].request,"group=News&"));key(app,KEY_BACK);node->selection=2;key(app,KEY_SELECT);assert(strstr(app->api.r[API_BROWSE].request,"group=&"));key(app,KEY_BACK);key(app,KEY_INFO);ui_copy(app->query,sizeof(app->query),"news");app->keyboard_focus=44;key(app,KEY_SELECT);assert(strstr(app->api.r[API_BROWSE].request,"query=news&")&&!strstr(app->api.r[API_BROWSE].request,"group="));
-    key(app,KEY_GUIDE);unsigned generation=app->api.generation;ApiResponse poll={API_POLL,API_OK,generation-1,200,(const unsigned char *)"{\"authenticated\":true}",22};app_response(app,&poll);assert(app->screen==SCREEN_HOME&&!app->awaiting);reply(app,API_PAIR,"{\"code\":\"123456\"}");assert(app->screen==SCREEN_HOME); /* Late approval/code cannot navigate away from home. */
-    app_free(app);app_init(app,1);app->start_hidden=1;reply(app,API_READY,"{\"ready\":true,\"frontend\":\"native\",\"doomRunning\":false,\"mediaBusy\":true}");assert(app->screen==SCREEN_HIDDEN&&!app->start_hidden&&!app->frontend_prepared);
-    /* Playback predates a transparent maintenance restart: stopping it must
-       restore Home, never the already-completed startup screen. */
-    reply(app,API_STATE,"{\"playing\":true,\"source\":\"jellyfin\",\"transport\":{}}");assert(app->screen==SCREEN_HIDDEN);
-    reply(app,API_STATE,"{\"playing\":false,\"transport\":{}}");assert(app->screen==SCREEN_HOME&&app->ready&&!app->frontend_prepared);
-    /* A saved media selection still wins when this process started playback. */
-    app->screen=SCREEN_HIDDEN;app->frontend_prepared=1;app->return_screen=SCREEN_DETAILS;app->return_source=SOURCE_JELLYFIN;app->source=SOURCE_IPTV;app->sources[0].node[0].selection=3;
-    reply(app,API_STATE,"{\"playing\":true,\"source\":\"jellyfin\",\"transport\":{}}");reply(app,API_STATE,"{\"playing\":false,\"transport\":{}}");assert(app->screen==SCREEN_DETAILS&&app->source==SOURCE_JELLYFIN&&app->sources[0].node[0].selection==3&&!app->frontend_prepared);
-    /* An Android/API stop while native player controls are visible also
-       restores browsing, instead of retaining a stale player/error overlay. */
-    app->screen=SCREEN_PLAYER;app->playback.playing=1;app->loading=1;app->player_until=99999;
-    reply(app,API_STATE,"{\"playing\":false,\"transport\":{}}");assert(app->screen==SCREEN_DETAILS&&!app->loading&&!app->player_until);
-    /* Explicit STOP and state polling use the same restoration contract. */
-    app->return_screen=SCREEN_STARTUP;app->screen=SCREEN_HIDDEN;reply(app,API_STOP,"{\"ok\":true}");assert(app->screen==SCREEN_HOME);
-    key(app,KEY_MENU);assert(app->screen==SCREEN_HOME);
-    app_free(app);free(app);puts("PASS JSON, Unicode, raw keys, ribbon, state restoration, stale replies, keyboard, idle frames, GUIDE during preparation, invalid artwork, Doom restart handoff, IPTV All/exact/empty/search routing, stale Quick Connect");return 0;
+    App *app=calloc(1,sizeof *app);assert(app);app_init(app,1);
+    /* Home handles all bounded registry sizes, including no enabled entries. */
+    for(int count=0;count<=REBOX_MAX_MODULES;count++){
+        app->modules.count=count;app->home_count=0;app->home=0;app->screen=SCREEN_HOME;
+        for(int i=0;i<count;i++){ModuleDescriptor *m=&app->modules.items[i];memset(m,0,sizeof *m);snprintf(m->id,sizeof m->id,"unknown-%d",i);snprintf(m->name,sizeof m->name,"Module %d",i);m->installed=m->enabled=m->healthy=m->home=m->browse=m->search=1;}
+        app_rebuild_home(app);assert(app->home_count==count);key(app,KEY_LEFT);assert(app->home==(count?count-1:0));key(app,KEY_RIGHT);assert(app->home==0);
+    }
+    app->modules.items[0].enabled=0;app_rebuild_home(app);assert(app->home_count==31);assert(strcmp(app_home_module(app,0)->id,"unknown-0"));
+    app->home=0;key(app,KEY_SELECT);assert(app->screen==SCREEN_BROWSER);assert(strstr(app->api.r[API_BROWSE].request,"/api/modules/unknown-1/browse?"));
+    api_cancel(&app->api,API_BROWSE);
+    reply(app,API_MEDIA,"{\"items\":[{\"id\":\"a/b:c\",\"title\":\"Folder\",\"kind\":\"folder\"}],\"total\":1,\"offset\":0,\"hasMore\":false}");
+    key(app,KEY_SELECT);assert(app->depth==1);assert(strstr(app->api.r[API_BROWSE].request,"parent=a%2Fb%3Ac&"));
+    api_cancel(&app->api,API_BROWSE);key(app,KEY_LEFT);assert(app->depth==0);api_cancel(&app->api,API_BROWSE);
+    app->loading=0;key(app,KEY_INFO);assert(app->screen==SCREEN_KEYBOARD);ui_copy(app->query,sizeof app->query,"foo");app->keyboard_focus=44;key(app,KEY_SELECT);assert(strstr(app->api.r[API_BROWSE].request,"/search?parent=&q=foo&offset=0"));
+    unsigned stale=app->api.generation;key(app,KEY_GUIDE);ApiResponse delayed={API_MEDIA,API_OK,stale,200,(const unsigned char *)"{\"items\":[]}",12};app_response(app,&delayed);assert(app->screen==SCREEN_HOME);
+    /* Search-first behavior depends only on declared capabilities. */
+    app->modules.items[1].browse=0;key(app,KEY_SELECT);assert(app->screen==SCREEN_KEYBOARD);key(app,KEY_GUIDE);app->modules.items[1].browse=1;
+    /* URL entry has a separate bounded buffer and all required punctuation. */
+    app->screen=SCREEN_KEYBOARD;app->keyboard_mode=KEYBOARD_URL;const char *symbols=":/.-_?&=%#~+@";for(const char *p=symbols;*p;p++){app->keyboard_focus=(int)(strchr(app_keyboard_letters(app),*p)-app_keyboard_letters(app));key(app,KEY_SELECT);}assert(!strcmp(app->entry,symbols));
+    app->keyboard_focus=0;for(int i=0;i<1100;i++)key(app,KEY_SELECT);assert(strlen(app->entry)==1024);assert(strlen(app->query)==3);app->keyboard_focus=53;key(app,KEY_SELECT);assert(!*app->entry);app->keyboard_focus=50;key(app,KEY_SELECT);app->keyboard_focus=0;key(app,KEY_SELECT);assert(!strcmp(app->entry,"A"));
+    /* Physical LEFT backs out once; held LEFT cannot pop a history stack. */
+    app_fixture(app,"browser");app_key(app,(KeyEvent){KEY_LEFT,1,1,0});assert(app->screen==SCREEN_BROWSER);key(app,KEY_SELECT);assert(app->screen==SCREEN_DETAILS);key(app,KEY_LEFT);assert(app->screen==SCREEN_BROWSER);key(app,KEY_LEFT);assert(app->screen==SCREEN_HOME);
+    app->screen=SCREEN_HOME;app->playback=(PlaybackState){0};app->dirty=0;reply(app,API_STATE,"{\"playing\":false,\"source\":\"\"}");assert(!app->dirty);
+    reply(app,API_STATE,"{\"playing\":true,\"source\":\"external-module\",\"generation\":5,\"transport\":{\"stop\":true}}");assert(app->screen==SCREEN_HIDDEN&&app->dirty);key(app,KEY_GUIDE);reply(app,API_STATE,"{\"playing\":true,\"source\":\"external-module\",\"generation\":5}");assert(app->screen==SCREEN_HOME);
+    app->awaiting=API_PLAY;reply(app,API_PLAY,"{\"playing\":true,\"source\":\"external-module\",\"generation\":6}");assert(app->screen==SCREEN_HOME); /* GUIDE during preparation stays visible. */
+    reply(app,API_STATE,"{\"playing\":false,\"instance\":\"new-core-instance\",\"generation\":0}");assert(!app->playback.playing&&!app->observed_play_generation);
+    ApiResponse timeout={API_STATE,API_TIMEOUT,app->api.generation,0,NULL,0};app->notice[0]=0;app_response(app,&timeout);assert(!*app->notice&&app->status_failures==1);
+    app_free(app);app_init(app,1);app->start_hidden=1;reply(app,API_READY,"{\"ready\":true,\"frontend\":\"native\",\"nativeModule\":\"\",\"mediaBusy\":true}");assert(app->screen==SCREEN_HIDDEN&&!app->frontend_prepared);
+    reply(app,API_STATE,"{\"playing\":true,\"source\":\"some-new-module\",\"generation\":1}");reply(app,API_STATE,"{\"playing\":false,\"generation\":1}");assert(app->screen==SCREEN_HOME);
+    app->return_screen=SCREEN_DETAILS;ui_copy(app->return_module,sizeof app->return_module,"some-new-module");app->screen=SCREEN_PLAYER;app->playback.playing=1;app->loading=1;app->player_until=99999;
+    reply(app,API_STATE,"{\"playing\":false,\"generation\":1}");assert(app->screen==SCREEN_DETAILS&&!app->loading&&!app->player_until&&!strcmp(app->active_module,"some-new-module"));
+    app_free(app);app_init(app,1);reply(app,API_READY,"{\"ready\":true,\"frontend\":\"native\",\"mediaBusy\":true,\"nativeModule\":\"unknown-native\"}");assert(app->native_app_running&&app->screen==SCREEN_NATIVE_APP);reply(app,API_NATIVE_STATUS,"{\"running\":false}");assert(app->screen==SCREEN_HOME&&!app->native_app_running);
+    Artwork art={0};ui_copy(art.pending,sizeof art.pending,"bad");assert(artwork_accept(&art,(const unsigned char *)"garbage",7,1)<0);assert(artwork_find(&art,"bad")->failed);artwork_free(&art);
+    assert(sizeof(App)<256*1024);printf("PASS runtime Home 0..32, opaque navigation, search-first, URL keyboard, stale replies, generic playback/native restoration; App=%zu bytes\n",sizeof(App));
+    app_free(app);free(app);return 0;
 }

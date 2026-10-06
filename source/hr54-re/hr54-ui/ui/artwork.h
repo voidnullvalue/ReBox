@@ -4,9 +4,9 @@
 #define ART_ENTRIES 8
 #define ART_W UI_DETAIL_W
 #define ART_H 160
-typedef struct { char id[160];unsigned char *pixels;uint64_t used;int failed; } ArtEntry;
+typedef struct { char id[384];unsigned char *pixels;uint64_t used;int failed,width,height; } ArtEntry;
 typedef struct ArtJob ArtJob;
-typedef struct { ArtEntry entry[ART_ENTRIES];char pending[160];ArtJob *job;pthread_t worker; } Artwork;
+typedef struct { ArtEntry entry[ART_ENTRIES];char pending[384];int pending_icon;ArtJob *job;pthread_t worker; } Artwork;
 void artwork_free(Artwork *);
 void artwork_reset(Artwork *);
 int artwork_accept(Artwork *,const unsigned char *,size_t,int);

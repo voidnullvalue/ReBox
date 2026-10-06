@@ -17,9 +17,15 @@ test: host
 clean:
 	rm -f build/hr54-ui-host build/hr54-ui build/test-ui
 
-build/test-modules: tests/test_modules.c api/module_models.c api/modules.c api/json.c api/client.c api/modules.h api/models.h
+build/test-modules: tests/test_modules.c api/models.c api/modules.c api/json.c api/client.c api/modules.h api/models.h
 	mkdir -p build
-	$(CC) $(CFLAGS) -o $@ tests/test_modules.c api/module_models.c api/modules.c api/json.c api/client.c -lm
+	$(CC) $(CFLAGS) -o $@ tests/test_modules.c api/models.c api/modules.c api/json.c api/client.c -lm
 
 test-modules: build/test-modules
 	./build/test-modules
+
+.PHONY: test-modules test-module-integration
+test-module-integration: host
+	$(MAKE) -C ../reboxd all build/jellyfin-module
+	python3 tests/modules_e2e.py
+	python3 tests/jellyfin_e2e.py

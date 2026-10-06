@@ -1,5 +1,9 @@
 #include "client.h"
-void api_init(ApiClient *a,int port){memset(a,0,sizeof(*a));a->port=port;for(int i=0;i<API_SLOTS;i++)a->r[i].fd=-1;FILE *secret=fopen("/var/hr54-persist/rebox/module-state/management.secret","r");if(secret){char token[80]={0};size_t n=fread(token,1,sizeof token-1,secret);fclose(secret);if(n==64&&strspn(token,"0123456789abcdef")==64)memcpy(a->management,token,65);}}
+void api_init(ApiClient *a,int port){memset(a,0,sizeof(*a));a->port=port;for(int i=0;i<API_SLOTS;i++)a->r[i].fd=-1;const char *secret_path="/var/hr54-persist/rebox/module-state/management.secret";
+#ifndef HR54_RECEIVER
+const char *fixture=getenv("REBOX_HOST_MANAGEMENT_SECRET_FILE");if(fixture)secret_path=fixture;
+#endif
+FILE *secret=fopen(secret_path,"r");if(secret){char token[80]={0};size_t n=fread(token,1,sizeof token-1,secret);fclose(secret);int valid=n==64;for(size_t i=0;i<n;i++)if(!strchr("0123456789abcdef",token[i]))valid=0;if(valid)memcpy(a->management,token,65);}}
 void api_cancel(ApiClient *a,int i){ApiRequest *r=&a->r[i];if(r->fd>=0)close(r->fd);free(r->data);memset(r,0,sizeof(*r));r->fd=-1;}
 void api_close(ApiClient *a){for(int i=0;i<API_SLOTS;i++)api_cancel(a,i);}
 int api_busy(const ApiClient *a,int i){return a->r[i].kind!=API_NONE;}
