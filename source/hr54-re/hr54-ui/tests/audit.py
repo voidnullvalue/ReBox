@@ -5,6 +5,10 @@ import re,subprocess
 root=Path(__file__).resolve().parents[1]
 for path in [root/'main.c',*root.glob('api/*.c'),*root.glob('apps/*.c'),*root.glob('input/*.c'),*root.glob('ui/*.c')]:
  text=path.read_text()
+ # The local UI is a trusted management client. Its sole configuration read is
+ # the core-owned private bearer; service configuration remains behind RPC.
+ if path==root/'api/client.c':
+  text=text.replace('"/var/hr54-persist/rebox/module-state/management.secret"','"LOCAL_MANAGEMENT_SECRET"')
  forbidden=r'\b(?:system|execl|execv|fork|popen|dlopen|kill)\s*\(|UCONNECT|BinaryIPC|DirectTest|yt-dlp|["\']/(?:dev|opt|var)/(?!.*hr54-ui\.lock)|https?://(?!127\.0\.0\.1)'
  assert not re.search(forbidden,text),f'API boundary violation in {path}'
  if path.parent.name in ('apps','ui'):

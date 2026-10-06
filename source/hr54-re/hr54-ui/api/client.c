@@ -1,5 +1,5 @@
 #include "client.h"
-void api_init(ApiClient *a,int port){memset(a,0,sizeof(*a));a->port=port;for(int i=0;i<API_SLOTS;i++)a->r[i].fd=-1;}
+void api_init(ApiClient *a,int port){memset(a,0,sizeof(*a));a->port=port;for(int i=0;i<API_SLOTS;i++)a->r[i].fd=-1;FILE *secret=fopen("/var/hr54-persist/rebox/module-state/management.secret","r");if(secret){char token[80]={0};size_t n=fread(token,1,sizeof token-1,secret);fclose(secret);if(n==64&&strspn(token,"0123456789abcdef")==64)memcpy(a->management,token,65);}}
 void api_cancel(ApiClient *a,int i){ApiRequest *r=&a->r[i];if(r->fd>=0)close(r->fd);free(r->data);memset(r,0,sizeof(*r));r->fd=-1;}
 void api_close(ApiClient *a){for(int i=0;i<API_SLOTS;i++)api_cancel(a,i);}
 int api_busy(const ApiClient *a,int i){return a->r[i].kind!=API_NONE;}
@@ -8,7 +8,8 @@ int api_send(ApiClient *a,int slot,ApiKind kind,const char *method,const char *p
     if(slot<0||slot>=API_SLOTS||!path||path[0]!='/'||strchr(path,'\r')||strchr(path,'\n')||strlen(path)>1700)return -1;
     if(api_busy(a,slot)){if(slot==API_BROWSE||slot==API_ARTWORK)api_cancel(a,slot);else return -1;}
     ApiRequest *r=&a->r[slot];r->kind=kind;r->slot=slot;r->generation=a->generation;r->timeout=timeout;r->is_get=!strcmp(method,"GET");r->cap=kind==API_IMAGE?2*1024*1024:512*1024;r->data=malloc(r->cap+1);if(!r->data){api_cancel(a,slot);return -1;}
-    int n=snprintf(r->request,sizeof(r->request),"%s %s HTTP/1.0\r\nHost: 127.0.0.1:%d\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: %u\r\n\r\n%s",method,path,a->port,(unsigned)(body?strlen(body):0),body?body:"");
+    char authorization[100]="";if(*a->management)snprintf(authorization,sizeof authorization,"Authorization: Bearer %s\r\n",a->management);
+    int n=snprintf(r->request,sizeof(r->request),"%s %s HTTP/1.0\r\nHost: 127.0.0.1:%d\r\nConnection: close\r\n%sContent-Type: application/json\r\nContent-Length: %u\r\n\r\n%s",method,path,a->port,authorization,(unsigned)(body?strlen(body):0),body?body:"");
     if(n<0||(size_t)n>=sizeof(r->request)){api_cancel(a,slot);return -1;}r->size=n;uint64_t now=ui_now();if(connect_request(a,r,now)){if(r->fd>=0)close(r->fd);r->fd=-1;r->retry_at=now+200;r->phase=3;}return 0;
 }
 static void complete(ApiClient *a,ApiRequest *r,ApiError e,ApiSink sink,void *ctx){if(e==API_TIMEOUT&&getenv("HR54_INPUT_TRACE"))fprintf(stderr,"http-trace: timeout kind=%d used=%u header=%u body=%u expected=%u framed=%d\n",r->kind,(unsigned)r->used,(unsigned)r->header,(unsigned)(r->used-r->header),(unsigned)r->body_length,r->has_length);ApiResponse response={r->kind,e,r->generation,r->status,(unsigned char *)r->data+r->header,r->used-r->header};int slot=r->slot;sink(ctx,&response);/* callbacks may enqueue other slots, but this slot stays occupied until return */api_cancel(a,slot);}
