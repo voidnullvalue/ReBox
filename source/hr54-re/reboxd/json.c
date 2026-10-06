@@ -407,4 +407,3 @@ int jbool(struct jval *v, int dflt) {
     if (v->t == J_FALSE || v->t == J_NULL) return 0;
     return dflt;
 }
-

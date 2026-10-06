@@ -1,0 +1,1 @@
+{"schema":1,"id":"test-media","name":"Test media","version":"1.0.0","description":"Module protocol fixture","moduleApi":1,"minReboxApi":1,"kind":"media","entrypoint":"bin/module","capabilities":{"browse":true,"search":true,"playback":true},"ui":{"order":999}}
