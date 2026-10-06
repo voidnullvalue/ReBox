@@ -1,5 +1,12 @@
 import json,os,pathlib,shutil,socket,subprocess,tempfile,time,unittest,urllib.request,urllib.error
 ROOT=pathlib.Path(__file__).resolve().parents[1]
+def module_children(process):
+    children=set()
+    for task in pathlib.Path(f'/proc/{process.pid}/task').iterdir():
+        try:children.update((task/'children').read_text().split())
+        except FileNotFoundError:pass  # A completed HTTP worker can exit between reads.
+    return sorted(children)
+
 class Runtime(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(prefix='rb-');self.addCleanup(self.tmp.cleanup);self.base=pathlib.Path(self.tmp.name);self.root=self.base/'r';self.root.mkdir()
@@ -43,16 +50,14 @@ class Runtime(unittest.TestCase):
 
     def test_active_module_crash_clears_playback(self):
         self.install();self.start();self.get('/api/modules/test-media/play',{'itemId':'item-1'})
-        children=[]
-        for task in pathlib.Path(f'/proc/{self.daemon.pid}/task').iterdir():children.extend((task/'children').read_text().split())
+        children=module_children(self.daemon)
         self.assertEqual(len(children),1);os.kill(int(children[0]),9)
         for _ in range(30):
             if not self.get('/api/state')['playing']:break
             time.sleep(.05)
         self.assertFalse(self.get('/api/state')['playing']);self.assertTrue(self.get('/api/system/status')['ready'])
     def test_crash_containment(self):
-        self.install();self.start();children=[]
-        for task in pathlib.Path(f'/proc/{self.daemon.pid}/task').iterdir():children.extend((task/'children').read_text().split())
+        self.install();self.start();children=module_children(self.daemon)
         self.assertEqual(len(children),1);os.kill(int(children[0]),9)
         time.sleep(.3);self.assertTrue(self.get('/api/system/status')['ready']);self.assertFalse(self.get('/api/modules')['modules'][0]['healthy'])
 if __name__=='__main__':unittest.main()

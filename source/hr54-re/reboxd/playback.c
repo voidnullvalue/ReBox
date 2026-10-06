@@ -1,4 +1,5 @@
 #include "playback.h"
+#include "native_app.h"
 #include "module_rpc.h"
 #include "module_auth.h"
 #include "system.h"
@@ -166,6 +167,7 @@ static Playback begin(const ReboxModule *m, const char *item, double position, u
     return next;
 }
 int rb_play(ReboxRegistry *r, ReboxModule *m, const char *body, struct sb *out) {
+    if(rb_native_busy(NULL))return 409;
     if (!m->installed) return 404;
     if (!m->enabled || !m->healthy || !m->playback) return 409;
     struct jval *request = json_parse(body, strlen(body)); char item[256];

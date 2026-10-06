@@ -6,6 +6,7 @@
 #include "module_manager.h"
 #include "module_auth.h"
 #include "compat.h"
+#include "native_app.h"
 #include "system.h"
 static RbAuth auth;
 static volatile sig_atomic_t stopping;
@@ -13,7 +14,7 @@ static ReboxRegistry registry,published;
 static pthread_mutex_t core_lock=PTHREAD_MUTEX_INITIALIZER,snapshot_lock=PTHREAD_MUTEX_INITIALIZER,clients_lock=PTHREAD_MUTEX_INITIALIZER;
 static unsigned clients;
 static void publish(void){pthread_mutex_lock(&snapshot_lock);published=registry;pthread_mutex_unlock(&snapshot_lock);}
-static void *supervise(void *unused){(void)unused;while(!stopping){if(!pthread_mutex_trylock(&core_lock)){rb_process_tick(&registry);rb_playback_tick(&registry);publish();pthread_mutex_unlock(&core_lock);}nap(.2);}return NULL;}
+static void *supervise(void *unused){(void)unused;while(!stopping){if(!pthread_mutex_trylock(&core_lock)){rb_process_tick(&registry);rb_playback_tick(&registry);rb_native_tick(&registry);publish();pthread_mutex_unlock(&core_lock);}nap(.2);}return NULL;}
 
 static void stop_signal(int sig){(void)sig;stopping=1;}
 static void request(int fd) {
@@ -22,7 +23,7 @@ static void request(int fd) {
     if(!code&&!strcmp(q->method,"GET")){
         if(!strcmp(q->path,"/api/modules")){pthread_mutex_lock(&snapshot_lock);rb_registry_json(&published,&out);pthread_mutex_unlock(&snapshot_lock);rb_http_json(fd,200,out.p);goto done;}
         if(!strcmp(q->path,"/api/state")){rb_playback_json(&out);rb_http_json(fd,200,out.p);goto done;}
-        if(!strcmp(q->path,"/api/system/status")){rb_http_json(fd,200,rb_playback_busy(NULL)?"{\"ok\":true,\"ready\":true,\"frontend\":\"native\",\"nativeModule\":\"\",\"mediaBusy\":true}":"{\"ok\":true,\"ready\":true,\"frontend\":\"native\",\"nativeModule\":\"\",\"mediaBusy\":false}");goto done;}
+        if(!strcmp(q->path,"/api/system/status")){rb_native_system_json(&out);rb_http_json(fd,200,out.p);goto done;}
         if(!strncmp(q->path,"/module-stream/",15)){rb_stream_proxy(fd,q->path+15);goto done;}
     }
     if(!code&&!strcmp(q->method,"POST")&&!strcmp(q->path,"/api/playback/stop")){int rc=rb_transport(&registry,"stop",q->body,&out);if(rc==200)rb_http_json(fd,rc,out.p);else rb_http_error(fd,rc,"stop failed");goto done;}
@@ -63,6 +64,7 @@ static void request(int fd) {
             else rb_http_error(fd,404,"icon unavailable");free(bytes);
         }
         else if(!m->enabled||!m->healthy)rb_http_error(fd,409,"module unavailable");
+        else if(end&&!strncmp(end,"/native/",8)&&m->native_app){const char *op=end+8;int method=!strcmp(op,"status")?!strcmp(q->method,"GET"):!strcmp(q->method,"POST");int code=method?rb_native_operation(m,op,q->body,&out):405;if(code==200)rb_http_json(fd,200,out.p);else rb_http_error(fd,code,"native lifecycle operation failed");}
         else if(end&&!strcmp(end,"/play")&&!strcmp(q->method,"POST")){int code=rb_play(&registry,m,q->body,&out);if(code==200)rb_http_json(fd,200,out.p);else rb_http_error(fd,code,"playback preparation failed");}
         else if(end&&!strcmp(q->method,"GET")&&(((!strcmp(end,"/browse")||!strncmp(end,"/browse?",8))&&m->browse)||((!strcmp(end,"/search")||!strncmp(end,"/search?",8))&&m->search))){
             RbReply reply;if(rb_rpc(m,"GET",end,NULL,&reply,120))rb_http_error(fd,502,"module request failed");
@@ -74,7 +76,7 @@ static void request(int fd) {
                 else{const char *type="application/json";int valid=1;if(!strncmp(end,"/art/",5)){if(reply.body.len>=8&&!memcmp(reply.body.p,"\x89PNG\r\n\x1a\n",8))type="image/png";else if(reply.body.len>=3&&!memcmp(reply.body.p,"\xff\xd8\xff",3))type="image/jpeg";else valid=0;}
                     if(valid)rb_http_reply(fd,reply.status,type,reply.body.p,reply.body.len);else rb_http_error(fd,404,"artwork unavailable");rb_reply_free(&reply);}}
         }else rb_http_error(fd,404,"unsupported module operation");
-    } else if(!strcmp(q->method,"GET")&&!strcmp(q->path,"/api/system/status"))rb_http_json(fd,200,"{\"ok\":true,\"ready\":true,\"frontend\":\"native\",\"nativeModule\":\"\",\"mediaBusy\":false}");
+    }
     else if(!strcmp(q->method,"POST")&&!strcmp(q->path,"/api/system/frontend/prepare")){
         struct jval *v=json_parse(q->body,q->length);if(!v||v->t!=J_OBJ||v->n)rb_http_error(fd,400,"no parameters accepted");
         else if(rb_frontend_prepare(&out))rb_http_error(fd,409,"frontend preparation failed");else rb_http_json(fd,200,out.p);jfree(v);
@@ -88,7 +90,7 @@ int main(int argc,char **argv) {
     if(argc>1)root=argv[1];if(argc>2)port=atoi(argv[2]);if(argc>4||port<1||port>65535)return 2;
     umask(077);if(rb_registry_load(&registry,root)){fprintf(stderr,"reboxd: %s\n",g_err);return 1;}
     if(rb_manager_recover(&registry)||rb_registry_load(&registry,root)||rb_auth_init(&auth,root))return 1;
-    if(rb_process_init(argc>3?argv[3]:"/tmp/rebox-modules"))return 1;
+    if(rb_process_init(argc>3?argv[3]:"/tmp/rebox-modules")||rb_native_init(&registry))return 1;
     publish();rb_playback_port(port);
     int listener=rb_listen_tcp(port);if(listener<0){perror("reboxd listener");return 1;}
     signal(SIGPIPE,SIG_IGN);signal(SIGTERM,stop_signal);signal(SIGINT,stop_signal);

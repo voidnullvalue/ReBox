@@ -1,6 +1,9 @@
 #include "../shared/sdk.h"
+static int native_running;
+static pthread_mutex_t native_lock=PTHREAD_MUTEX_INITIALIZER;
 static void handle(int fd,const RbRequest *r) {
     if(!strcmp(r->path,"/status")){rb_http_json(fd,200,"{\"ok\":true,\"moduleApi\":1}");return;}
+    if(!strncmp(r->path,"/native/",8)){pthread_mutex_lock(&native_lock);if(!strcmp(r->path,"/native/start"))native_running=1;else if(!strcmp(r->path,"/native/stop"))native_running=0;struct sb out={0};sb_fmt(&out,"{\"ok\":true,\"running\":%s}",native_running?"true":"false");pthread_mutex_unlock(&native_lock);rb_http_json(fd,200,out.p);free(out.p);return;}
     char parent[256]="",q[256]="";const char *query=strchr(r->path,'?');query_param(query?query+1:"","parent",parent,sizeof parent);query_param(query?query+1:"","q",q,sizeof q);
     if(!strncmp(r->path,"/browse",7)||!strncmp(r->path,"/search",7)){
         const char *items=*parent?"[{\"id\":\"item-2\",\"title\":\"Item 2\",\"kind\":\"item\",\"playable\":true}]":

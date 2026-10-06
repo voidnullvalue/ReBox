@@ -4,6 +4,7 @@
 #include "module_auth.h"
 #include "package.h"
 #include "playback.h"
+#include "native_app.h"
 static void state_path(const ReboxRegistry *r,const char *id,char path[REBOX_PATH_MAX]){char file[80];snprintf(file,sizeof file,"%s.json",id);rb_path(path,REBOX_PATH_MAX,r->root,"module-state",file);}
 static int copy_file(const char *from,const char *to,size_t cap){size_t n;char *p=rb_read(from,cap,&n);if(!p)return -1;int rc=rb_atomic(to,p,n);free(p);return rc;}
 /* A single journal is sufficient: all mutations execute on the core reactor.
@@ -39,7 +40,7 @@ int rb_manager_install(ReboxRegistry *r,const char *url,const char *sha,const ch
     if(rb_mkdir(unpacked)||rb_package_extract(package,unpacked))goto done;
     ReboxModule next;int parsed=rb_manifest_file(unpacked,&next);if(parsed||rb_module_files(unpacked,&next))goto done;
     ReboxModule *previous=rb_registry_find(r,next.id);ReboxModule backup={0};
-    if(previous){backup=*previous;if(previous->core&&strcmp(previous->sha256,digest)){code=403;goto done;}if(rb_playback_busy(next.id)){code=409;goto done;}}
+    if(previous){backup=*previous;if(previous->core&&strcmp(previous->sha256,digest)){code=403;goto done;}if(rb_playback_busy(next.id)||rb_native_busy(next.id)){code=409;goto done;}}
     else if(r->count==REBOX_MAX_MODULES){code=409;goto done;}
     next.core=previous&&previous->core;next.installed=1;next.enabled=previous&&previous->installed?previous->enabled:1;next.default_enabled=previous?previous->default_enabled:0;
     if(previous){memcpy(next.package,previous->package,sizeof next.package);memcpy(next.sha256,previous->sha256,sizeof next.sha256);}
@@ -64,7 +65,7 @@ done:rb_remove_tree(dir);if(code!=200)rb_log(NULL,"install failed");return code;
 int rb_manager_mutate(ReboxRegistry *r,const char *id,const char *action,struct sb *out) {
     ReboxModule *m=rb_registry_find(r,id);if(!m)return 404;
     if(!strcmp(action,"reinstall")){if(!m->core)return 404;if(m->installed)return 409;char path[REBOX_PATH_MAX];rb_path(path,sizeof path,r->root,"builtin",m->package);return rb_manager_install(r,NULL,m->sha256,path,out);}
-    if(!m->installed)return 404;if(rb_playback_busy(id))return 409;
+    if(!m->installed)return 404;if(rb_playback_busy(id)||rb_native_busy(id))return 409;
     if(!strcmp(action,"enable")){if(!m->compatible)return 409;if(rb_process_start(r,m,1))return 502;m->enabled=1;if(rb_state_save(r,m)){m->enabled=0;rb_process_stop(m);return 500;}rb_log(id,"enabled");}
     else if(!strcmp(action,"disable")){if(rb_process_stop(m))return 409;int was=m->enabled;m->enabled=0;if(rb_state_save(r,m)){m->enabled=was;if(was)rb_process_start(r,m,0);return 500;}rb_log(id,"disabled");}
     else if(!strcmp(action,"uninstall")) {

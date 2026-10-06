@@ -362,3 +362,38 @@ and persistence, and broken-server readiness. The real generic native UI opens
 ordinary camera items and plays/stops them. The module cross-compiles through
 `modules/frigate/build-receiver.sh`. Real stream/decoder behavior and receiver
 boot remain physical acceptance work.
+
+## Doom and generic native-app checkpoint
+
+`modules/doom` owns fixed executable/WAD selection, launch readiness, PID/exe
+identity verification, native.lock, reaping, clean shutdown and legacy input.
+It prefers the packaged engine; initial receiver data/WAD/markers remain under
+`jellyfin/doom`, with no migration/deletion. The old daemon includes these same
+module-owned lifecycle and transitional WebKit frame/input sources. Legacy
+`/api/doom/{status,start,stop,input,caps}` are adapters in the new core.
+
+Core's generic native_app coordinator owns one runtime ID and writes a durable
+`module-state/.native-owner.json` before starting presentation. System status
+returns that ID as nativeModule and keeps mediaBusy true while ownership is
+unresolved. Media playback, another native app and mutations of the active
+module return 409. Ownership is cleared only after a valid running=false RPC;
+missing, crashed or malformed module replies do not prove surface release.
+Core restarts preserve the owner journal; module restart may rejoin an engine
+whose lifecycle lock is still held. Modules are queried generically by declared
+nativeApp capability, never by provider ID. The shell performs the manifest's
+input/surface handoff and restores navigation after confirmed Stop.
+
+The Doom native lock still spans initialization and engine reaping. Stop sends
+SIGTERM only to a verified executable and does not force-kill a native engine
+whose surface shutdown times out. Core/module health stays separate from asset
+availability. **Doom audio remains unavailable.**
+
+Fixture tests cover an unknown native app, arbitration, mutation protection,
+journal recovery, a real mock-engine readiness pipe/process/lock, clean stop,
+PID reuse refusal and module-crash rejoin without dropping ownership. The real
+generic host UI launches/stops a newly named native app without rebuilding.
+The module wrapper cross-compiles through `modules/doom/build-receiver.sh`;
+the current generic shell also cross-compiles. These are not physical EGL,
+RF remote, Doom graphics/audio, or receiver boot acceptance. The core static
+MIPS binary builds, but its full build script still cannot link module-fetch
+because extracted vendor libcurl.so.4.4.0 is missing.

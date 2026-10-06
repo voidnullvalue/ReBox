@@ -1,0 +1,1 @@
+{"schema":1,"id":"doom","name":"Doom","version":"0.1.0","description":"Native Doom (audio currently unavailable)","moduleApi":1,"minReboxApi":1,"kind":"native-app","entrypoint":"bin/module","capabilities":{"nativeApp":true},"presentation":{"releaseSurface":true,"releaseInput":true},"ui":{"homeDescription":"Play Doom","order":500}}

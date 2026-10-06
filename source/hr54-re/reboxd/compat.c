@@ -1,6 +1,7 @@
 #include "compat.h"
 #include "module_rpc.h"
 #include "playback.h"
+#include "native_app.h"
 
 /* Service names here are legacy wire contracts, never runtime discovery or
  * generic dispatch. Operations and response translation remain module-owned. */
@@ -30,6 +31,12 @@ static const struct { const char *method, *old, *module, *operation, *rpc_method
     {"GET", "/api/frigate/cameras", "frigate", "/legacy/cameras", "GET"},
     {"GET", "/api/frigate/status", "frigate", "/legacy/cameras", "GET"},
     {"POST", "/api/frigate/play", "frigate", "/play", "POST"},
+    {"GET", "/api/doom/status", "doom", "/native/status", "GET"},
+    {"POST", "/api/doom/start", "doom", "/native/start", "POST"},
+    {"POST", "/api/doom/stop", "doom", "/native/stop", "POST"},
+    {"GET", "/api/doom/input", "doom", "/legacy/input", "GET"},
+    {"POST", "/api/doom/input", "doom", "/legacy/input", "POST"},
+    {"POST", "/api/doom/caps", "doom", "/legacy/caps", "POST"},
 };
 static int available(const ReboxModule *m) {
     return m && m->installed && m->enabled && m->healthy && m->compatible;
@@ -61,6 +68,9 @@ int rb_compat(int fd, const RbRequest *q, ReboxRegistry *registry) {
         ReboxModule *m = rb_registry_find(registry, routes[i].module);
         if (!m || !m->installed) { rb_http_error(fd, 404, "module not installed"); return 1; }
         if (!available(m)) { rb_http_error(fd, 409, "module unavailable"); return 1; }
+        if(!strncmp(routes[i].operation,"/native/",8)){
+            struct sb out={0};int code=rb_native_operation(m,routes[i].operation+8,q->body,&out);if(code==200)rb_http_json(fd,code,out.p);else rb_http_error(fd,code,"native lifecycle unavailable");free(out.p);return 1;
+        }
         if (!strcmp(routes[i].operation, "/play")) {
             struct sb out = {0}, translated = {0};
             int iptv = !strcmp(path, "/api/iptv/play");
