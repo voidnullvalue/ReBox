@@ -213,7 +213,7 @@ exiting MEDIA. No generic codec matrix was rerun.
 ```sh
 sh jellyfin/remote/build_iptv.sh
 python3 jellyfin/remote/test/iptv_playlist_test.py
-cc -O2 -o /tmp/hr54-iptv-fetch-host jellyfin/remote/hr54_iptv_fetch.c -lcurl
+cc -O2 -o /tmp/hr54-iptv-fetch-host modules/iptv/fetch.c -lcurl
 python3 jellyfin/remote/test/iptv_integration.py
 bash jellyfin/remote/test/run_host_tests.sh
 node jellyfin/remote/test/media_hub_test.js

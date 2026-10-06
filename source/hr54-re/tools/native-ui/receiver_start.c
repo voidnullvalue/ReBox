@@ -1,4 +1,4 @@
-/* Same startup method as jellyfin/remote/hr54_iptv_fetch.c. The receiver's
+/* Same startup method as modules/iptv/fetch.c. The receiver's
  * __uClibc_main initializes libc and performs normal exit/finalization. */
 extern int main(int, char **);
 extern void __uClibc_main(int (*)(int,char **),int,char **,void *,void *,void *,void *);

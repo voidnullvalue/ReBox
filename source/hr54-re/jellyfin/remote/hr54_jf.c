@@ -830,8 +830,8 @@ static int tv_state_load(struct sb *out) {
 /* Playback state machine                                              */
 /* ------------------------------------------------------------------ */
 
-#include "hr54_iptv_library.h"
-#include "hr54_iptv_clock.h"
+#include "../../modules/iptv/library.inc"
+#include "../../modules/iptv/clock.inc"
 
 static struct stream_slot *slot_by_token(const char *token) {
     for (int i = 0; i < JF_STREAM_SLOTS; i++)
@@ -1792,7 +1792,7 @@ static void serve_art(int fd, const char *method, const char *raw, int native_si
     resp_free(&r);
 }
 
-#include "hr54_iptv_relay.h"
+#include "../../modules/iptv/relay.inc"
 #include "hr54_youtube.h"
 
 /* ------------------------------------------------------------------ */

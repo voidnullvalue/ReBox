@@ -26,6 +26,7 @@ static void request(int fd) {
         if(!strncmp(q->path,"/module-stream/",15)){rb_stream_proxy(fd,q->path+15);goto done;}
     }
     if(!code&&!strcmp(q->method,"POST")&&!strcmp(q->path,"/api/playback/stop")){int rc=rb_transport(&registry,"stop",q->body,&out);if(rc==200)rb_http_json(fd,rc,out.p);else rb_http_error(fd,rc,"stop failed");goto done;}
+    if(!code&&rb_compat_control(fd,q,&registry))goto done;
     struct timespec until;clock_gettime(CLOCK_REALTIME,&until);until.tv_sec++;
     if(pthread_mutex_timedlock(&core_lock,&until)){rb_http_error(fd,409,"core operation in progress");goto done;}locked=1;
     if(code)rb_http_error(fd,code,"invalid HTTP request");

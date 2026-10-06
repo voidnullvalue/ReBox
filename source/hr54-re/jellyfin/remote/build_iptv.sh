@@ -11,5 +11,5 @@ iptv_sysroot=${HR54_SYSROOT:-$project/extracted/sdb4-rootfs}
     -fno-stack-protector -fno-builtin-fprintf -DHR54_UCLIBC_START -nostdlib \
     -Wl,-e,__start -Wl,--dynamic-linker=/lib/ld-uClibc.so.0 \
     -Wl,--allow-shlib-undefined -o "$here/bin/hr54-iptv-fetch" \
-    "$here/hr54_iptv_fetch.c" \
+    "$here/../../modules/iptv/fetch.c" \
     "$iptv_sysroot/usr/lib/libcurl.so.4.4.0" "$iptv_sysroot/lib/libc.so.0"

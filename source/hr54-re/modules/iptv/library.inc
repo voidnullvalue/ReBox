@@ -1,4 +1,4 @@
-/* Cached, bounded local M3U library. Included by hr54_jf.c. */
+/* Module-owned cached, bounded M3U library. */
 #include <stdint.h>
 #define IPTV_MAX_CHANNELS 10000
 #define IPTV_URL_CAP 8192
@@ -28,7 +28,7 @@ static int iptv_parse_file(const char *path,struct iptv_channel **out,size_t *co
  else if(*p&&*p!='#'&&c.name){if(strlen(p)>IPTV_URL_CAP||strlen(c.ua)>2048||strlen(c.ref)>2048||strpbrk(c.ua,"\r\n")||strpbrk(c.ref,"\r\n")||used==IPTV_MAX_CHANNELS){rc=fail("M3U entry exceeds bounds");break;}c.url=strdup(p);if(!c.url){rc=fail("out of memory");break;}uint64_t h=iptv_hash(iptv_hash(UINT64_C(14695981039346656037),c.tvg),"\n");h=iptv_hash(h,c.url);snprintf(c.id,sizeof c.id,"ch-%016llx",(unsigned long long)h);list[used++]=c;memset(&c,0,sizeof c);}}
  if(ferror(f))rc=fail("Error reading M3U");fclose(f);iptv_free_channel(&c);if(rc){for(size_t i=0;i<used;i++)iptv_free_channel(&list[i]);free(list);return -1;}*out=list;*count=used;return 0;
 }
-/* Parent owns cache; children inherit it copy-on-write. Reload before fork. */
+/* Call under the module operation mutex; stream workers copy their URLs. */
 static void iptv_reload(void){char path[512];snprintf(path,sizeof path,"%s/iptv/eng.m3u",persist_root);struct stat st;
  if(stat(path,&st)){if(!iptv_loaded)snprintf(iptv_library_error,sizeof iptv_library_error,"IPTV playlist unavailable");return;}
  if(iptv_loaded&&st.st_mtime==iptv_stat.st_mtime&&st.st_mtim.tv_nsec==iptv_stat.st_mtim.tv_nsec&&st.st_size==iptv_stat.st_size&&st.st_ino==iptv_stat.st_ino)return;

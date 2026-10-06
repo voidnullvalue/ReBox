@@ -4,4 +4,5 @@
 #include "http.h"
 /* Returns one only when this isolated legacy adapter handled the route. */
 int rb_compat(int, const RbRequest *, ReboxRegistry *);
+int rb_compat_control(int,const RbRequest *,ReboxRegistry *);
 #endif

@@ -200,7 +200,7 @@ python3 test/capability_api_test.py
 python3 test/jellyfin_relay_failure.py
 bash test/run_host_tests.sh
 python3 test/youtube_integration.py
-cc -O1 -o /tmp/hr54-iptv-fetch-host hr54_iptv_fetch.c -lcurl
+cc -O1 -o /tmp/hr54-iptv-fetch-host ../../modules/iptv/fetch.c -lcurl
 python3 test/iptv_integration.py
 node test/media_hub_test.js
 ```

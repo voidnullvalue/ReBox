@@ -26,6 +26,7 @@ test-modules: build/test-modules
 
 .PHONY: test-modules test-module-integration
 test-module-integration: host
-	$(MAKE) -C ../reboxd all build/jellyfin-module
+	$(MAKE) -C ../reboxd all build/jellyfin-module build/iptv-module build/iptv-fetch
 	python3 tests/modules_e2e.py
 	python3 tests/jellyfin_e2e.py
+	python3 tests/iptv_e2e.py

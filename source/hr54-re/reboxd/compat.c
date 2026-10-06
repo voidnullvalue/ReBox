@@ -16,6 +16,12 @@ static const struct { const char *method, *old, *module, *operation, *rpc_method
     {"POST", "/api/settings", "jellyfin", "/legacy/settings", "POST"},
     {"GET", "/api/jellyfin/status", "jellyfin", "/legacy/settings", "GET"},
     {"POST", "/api/play", "jellyfin", "/play", "POST"},
+    {"GET", "/api/iptv/groups", "iptv", "/legacy/groups", "GET"},
+    {"GET", "/api/iptv/channels", "iptv", "/legacy/channels", "GET"},
+    {"GET", "/api/iptv/status", "iptv", "/legacy/status", "GET"},
+    {"GET", "/api/iptv/state", "iptv", "/legacy/state", "GET"},
+    {"POST", "/api/iptv/state", "iptv", "/legacy/state", "POST"},
+    {"POST", "/api/iptv/play", "iptv", "/play", "POST"},
 };
 static int available(const ReboxModule *m) {
     return m && m->installed && m->enabled && m->healthy && m->compatible;
@@ -48,9 +54,20 @@ int rb_compat(int fd, const RbRequest *q, ReboxRegistry *registry) {
         if (!m || !m->installed) { rb_http_error(fd, 404, "module not installed"); return 1; }
         if (!available(m)) { rb_http_error(fd, 409, "module unavailable"); return 1; }
         if (!strcmp(routes[i].operation, "/play")) {
-            struct sb out = {0}; int code = rb_play(registry, m, q->body, &out);
+            struct sb out = {0}, translated = {0};
+            int iptv = !strcmp(path, "/api/iptv/play");
+            if (iptv) {
+                struct jval *v = json_parse(q->body, q->length);
+                sb_puts(&translated, "{\"itemId\":"); sb_json_str(&translated, jstr(jget(v, "channelId"))); sb_puts(&translated, "}"); jfree(v);
+            }
+            int code = rb_play(registry, m, iptv ? translated.p : q->body, &out);
+            if (code == 200 && iptv) {
+                struct jval *v = json_parse(out.p, out.len);
+                out.p[--out.len] = 0; sb_puts(&out, ",\"channelId\":"); sb_json_str(&out, jstr(jget(v, "itemId")));
+                sb_puts(&out, ",\"channelName\":"); sb_json_str(&out, jstr(jget(v, "title"))); sb_puts(&out, ",\"returnToTv\":true}"); jfree(v);
+            }
             if (code == 200) rb_http_json(fd, code, out.p); else rb_http_error(fd, code, "playback preparation failed");
-            free(out.p); return 1;
+            free(translated.p); free(out.p); return 1;
         }
         struct sb operation = {0}; sb_puts(&operation, routes[i].operation);
         if (query) { sb_puts(&operation, "?"); sb_puts(&operation, query); }
@@ -60,4 +77,15 @@ int rb_compat(int fd, const RbRequest *q, ReboxRegistry *registry) {
         free(operation.p); return 1;
     }
     return 0;
+}
+
+/* Stop must bypass the long-operation lock so a legacy client can cancel
+ * preparation. This adapter never stops another provider's playback. */
+int rb_compat_control(int fd, const RbRequest *q, ReboxRegistry *registry) {
+    if (strcmp(q->method, "POST") || strcmp(q->path, "/api/iptv/stop")) return 0;
+    int code = 200; struct sb out = {0};
+    if (rb_playback_busy("iptv")) code = rb_transport(registry, "stop", q->body, &out);
+    if (code == 200) rb_http_json(fd, code, "{\"ok\":true,\"stopped\":true}");
+    else rb_http_error(fd, code, "stop failed");
+    free(out.p); return 1;
 }

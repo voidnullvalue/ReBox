@@ -250,3 +250,49 @@ folders, searches, plays, disables, re-enables, and uninstalls without restartin
 or rebuilding the frontend. Another exercises Jellyfin browsing, quality
 settings, disconnect/connect and automatic auth-action polling through the
 same generic UI. The decoder is mocked; this is not physical HR54 acceptance.
+
+## IPTV migration checkpoint
+
+`modules/iptv` owns the bounded M3U cache/parser, stable channel IDs, group
+hierarchy, tvg metadata, logo fetches, TLS helper, HLS variant selection and
+MPEG-TS relay. Generic root returns All channels and opaque group folders;
+search returns ordinary playable items. It prepares an inert moduleProxy plan
+with Stop only; core owns decoder arbitration. Stop cancels upstream preparation
+and relay without taking the operation mutex. Stale session stops are ignored.
+
+On the receiver the module deliberately reuses the existing receiver-owned
+`/var/hr54-persist/jellyfin` directory for `iptv/eng.m3u`, certificate bundle and
+`state/iptv-state.json`. No playlist or state is moved or deleted. Fresh host
+fixtures use module-data. The packaged helper is `bin/fetch`; it runs through
+fixed argv, never shell interpolation. SNTP bootstrap runs separately from the
+module listener so optional network availability cannot block health/readiness.
+
+Legacy `/api/iptv/{groups,channels,status,state,play,stop}` endpoints in reboxd
+are adapters. The play adapter translates channelId and preserves channelId /
+channelName response fields; stop remains cancellable while preparation runs.
+The old distribution daemon temporarily includes the same module-owned parser
+and relay with its old decoder wrapper, as with the Jellyfin checkpoint. It is
+not the final production startup path.
+
+Validation:
+
+```sh
+make -C source/hr54-re/reboxd test
+make -C source/hr54-re/hr54-ui test-module-integration
+ZIG_GLOBAL_CACHE_DIR=/tmp/rebox-zig-cache \
+ZIG_LOCAL_CACHE_DIR=/tmp/rebox-zig-local \
+sh source/hr54-re/modules/iptv/build-receiver.sh
+```
+
+The module executable cross-compiles for MIPS. The last command cannot complete
+the receiver TLS helper in this checkout: extracted `libcurl.so.4.4.0` is absent.
+Host tests use the real curl helper against a local upstream, validate TS/HLS
+bytes, redirects/headers, sequence refresh, cancellation, EOF, rejected formats,
+legacy state and runtime discovery. A real native UI test opens All channels
+and a group folder and plays their opaque items through the generic frontend.
+These tests do not validate Broadcom playback, real channel compatibility or
+receiver boot. Production artifacts/checksums have not been replaced.
+
+The historical 2,096-channel parser comparison could not run: its source
+playlist is absent, and the distribution playlist is a different fixture.
+The new local playlist tests cover metadata, stable IDs, groups and reload.

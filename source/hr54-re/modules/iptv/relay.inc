@@ -7,7 +7,11 @@ static ssize_t iptv_read(struct iptv_fetch *f,void *buf,size_t cap,const char *t
  double until=mono_now()+20;for(;;){if(token&&!iptv_active(token))return fail("IPTV stopped");struct pollfd p={f->fd,POLLIN,0};int r=poll(&p,1,100);if(r<0&&errno==EINTR)continue;if(r<0)return -1;if(r){ssize_t n=read(f->fd,buf,cap);if(n<0&&errno==EINTR)continue;return n;}if(mono_now()>until)return fail("Channel unreachable or TLS connection failed");}}
 static int iptv_open(struct iptv_fetch *f,const char *url,const char *ua,const char *ref,int timeout,const char *token){
  memset(f,0,sizeof *f);f->fd=-1;if(strlen(url)>IPTV_URL_CAP||(strncmp(url,"http://",7)&&strncmp(url,"https://",8))||strpbrk(url,"\r\n"))return fail("Unsupported IPTV protocol");
- char helper[512],ca[512],seconds[16];snprintf(helper,sizeof helper,"%s/bin/hr54-iptv-fetch",persist_root);const char *env=getenv("IPTV_FETCH_CMD");if(env&&*env)snprintf(helper,sizeof helper,"%s",env);snprintf(ca,sizeof ca,"%s/iptv/ca-certificates.crt",persist_root);snprintf(seconds,sizeof seconds,"%d",timeout);
+ char helper[512],ca[512],seconds[16];snprintf(helper,sizeof helper,"%s/bin/hr54-iptv-fetch",persist_root);
+#ifdef REBOX_IPTV_MODULE
+ snprintf(helper,sizeof helper,"%s/bin/fetch",package_root);
+#endif
+ const char *env=getenv("IPTV_FETCH_CMD");if(env&&*env)snprintf(helper,sizeof helper,"%s",env);snprintf(ca,sizeof ca,"%s/iptv/ca-certificates.crt",persist_root);snprintf(seconds,sizeof seconds,"%d",timeout);
  pid_t owner=getpid();int p[2];if(pipe(p))return fail("Unable to start TLS helper");f->pid=fork();if(f->pid<0){close(p[0]);close(p[1]);return fail("Unable to start TLS helper");}
  if(!f->pid){prctl(PR_SET_PDEATHSIG,SIGKILL);if(getppid()!=owner)_exit(127);alarm(0);dup2(p[1],1);close(p[0]);close(p[1]);for(int inherited=3;inherited<1024;inherited++)close(inherited);execl(helper,helper,url,ca,ua,ref,seconds,(char *)NULL);_exit(127);}close(p[1]);f->fd=p[0];
  char header[IPTV_URL_CAP+260];size_t n=0;int newlines=0;while(n<sizeof header-1){char c;ssize_t r=iptv_read(f,&c,1,token);if(r<=0){iptv_fetch_close(f);return fail("Channel unavailable or TLS connection failed (see fetch log)");}header[n++]=c;if(c=='\n'&&++newlines==3)break;}header[n]=0;
@@ -85,6 +89,8 @@ static int iptv_probe(const struct iptv_channel *c,char *selected,const char *to
  if(strstr(b.p,"#EXT-X-STREAM-INF:")){int rc=iptv_variant(b.p,effective,selected);free(b.p);if(rc)return -1;continue;}
  struct iptv_media m;int rc=iptv_media_parse(b.p,&m);iptv_media_free(&m);free(b.p);if(rc)return -1;snprintf(selected,IPTV_URL_CAP+1,"%s",effective);return 0;}return fail("Too many nested HLS playlists");
 }
+#ifndef REBOX_IPTV_MODULE
+/* Transitional old-daemon wrapper. The module build prepares an inert plan. */
 static int iptv_play(const char *id,struct sb *out){
  struct iptv_channel *c=iptv_find(id);if(!c)return fail("Unknown IPTV channel ID");
  state_lock();int busy=S->playing||S->iptv_active||S->yt_active;state_unlock();if(busy)return fail("Stop current playback before changing channels");
@@ -99,6 +105,7 @@ static int iptv_play(const char *id,struct sb *out){
  if(active&&!claimed){receiver_stop();schedule_tv_return(1,POST_STOP_DISMISS);return fail("Receiver did not open IPTV stream");}if(!active)return fail("IPTV stream failed: %s",S->iptv_error);
  jf_log("IPTV playback started: %s (%s, generation %lu)",c->name,c->id,generation);sb_puts(out,"{\"playing\":true,\"source\":\"iptv\",\"live\":true,\"channelId\":");sb_json_str(out,c->id);sb_puts(out,",\"channelName\":");sb_json_str(out,c->name);sb_fmt(out,",\"generation\":%lu,",generation);sb_puts(out,"\"returnToTv\":true}");return 0;
 }
+#endif
 static int iptv_send(int fd,const void *p,size_t n,const char *token){if(!iptv_active(token))return -1;return write_all_fd(fd,p,n);}
 static void iptv_stream(int fd,const char *path,const char *method){
  if(strcmp(method,"GET")||strlen(path)!=35||strcmp(path+32,".ts")){send_json_error(fd,404,"Unknown IPTV stream",method);return;}char token[33];memcpy(token,path,32);token[32]=0;
@@ -123,7 +130,13 @@ static void iptv_stream(int fd,const char *path,const char *method){
  int end=m.end;double target=m.target;iptv_media_free(&m);if(rc||end)break;if(mono_now()-progressed>40){rc=fail("Live stream stalled");break;}for(double t=0;t<target/2&&iptv_active(token);t+=0.1)nap(0.1);
  }
  if(!started&&iptv_active(token))send_json_error(fd,502,g_err[0]?g_err:"Stream ended",method);
- state_lock();int owned=S->iptv_active&&!strcmp(S->iptv_token,token);if(owned){snprintf(S->iptv_error,sizeof S->iptv_error,"%s",rc&&g_err[0]?g_err:"Stream ended");int back=S->return_to_tv;playback_end_locked();state_unlock();jf_log("IPTV relay ended: %s",S->iptv_error);receiver_stop();schedule_tv_return(back,POST_STOP_DISMISS);}else state_unlock();
+ state_lock();int owned=S->iptv_active&&!strcmp(S->iptv_token,token);if(owned){snprintf(S->iptv_error,sizeof S->iptv_error,"%s",rc&&g_err[0]?g_err:"Stream ended");int back=S->return_to_tv;playback_end_locked();state_unlock();jf_log("IPTV relay ended: %s",S->iptv_error);
+#ifndef REBOX_IPTV_MODULE
+receiver_stop();schedule_tv_return(back,POST_STOP_DISMISS);
+#else
+(void)back;
+#endif
+}else state_unlock();
 }
 static int iptv_status(struct sb *out){sb_fmt(out,"{\"loaded\":%s,\"channels\":%zu,\"active\":%s,\"workerPid\":%d,\"error\":",iptv_loaded?"true":"false",iptv_count,S->iptv_active?"true":"false",S->iptv_worker);sb_json_str(out,iptv_library_error[0]?iptv_library_error:S->iptv_error);sb_puts(out,"}");return 0;}
 
