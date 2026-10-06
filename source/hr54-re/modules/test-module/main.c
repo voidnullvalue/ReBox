@@ -1,5 +1,6 @@
 #include "../shared/sdk.h"
 static void handle(int fd,const RbRequest *r) {
+    if(!strcmp(r->path,"/status")){rb_http_json(fd,200,"{\"ok\":true,\"moduleApi\":1}");return;}
     char parent[256]="",q[256]="";const char *query=strchr(r->path,'?');query_param(query?query+1:"","parent",parent,sizeof parent);query_param(query?query+1:"","q",q,sizeof q);
     if(!strncmp(r->path,"/browse",7)||!strncmp(r->path,"/search",7)){
         const char *items=*parent?"[{\"id\":\"item-2\",\"title\":\"Item 2\",\"kind\":\"item\",\"playable\":true}]":

@@ -13,7 +13,10 @@ class Runtime(unittest.TestCase):
         self.url=f'http://127.0.0.1:{port}';self.daemon=subprocess.Popen([str(ROOT/'build/reboxd-host'),str(self.root),str(port),str(self.socketdir)],cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         self.addCleanup(self.stop)
         for _ in range(150):
-            try:self.get('/api/modules');return
+            try:
+                modules=self.get('/api/modules')['modules']
+                if all(not m['enabled'] or m['healthy'] for m in modules):return
+                time.sleep(.05)
             except OSError:time.sleep(.05)
         raise AssertionError('core did not start')
     def stop(self):
@@ -31,6 +34,8 @@ class Runtime(unittest.TestCase):
         self.get('/api/playback/stop',{});self.assertFalse(self.get('/api/state')['playing'])
         self.stop();self.assertEqual(list(self.socketdir.glob('*.sock')),[])
     def test_crash_containment(self):
-        self.install();self.start();children=pathlib.Path(f'/proc/{self.daemon.pid}/task/{self.daemon.pid}/children').read_text().split();self.assertEqual(len(children),1);os.kill(int(children[0]),9)
+        self.install();self.start();children=[]
+        for task in pathlib.Path(f'/proc/{self.daemon.pid}/task').iterdir():children.extend((task/'children').read_text().split())
+        self.assertEqual(len(children),1);os.kill(int(children[0]),9)
         time.sleep(.3);self.assertTrue(self.get('/api/system/status')['ready']);self.assertFalse(self.get('/api/modules')['modules'][0]['healthy'])
 if __name__=='__main__':unittest.main()

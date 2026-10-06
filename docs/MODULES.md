@@ -159,3 +159,50 @@ from trusted sources.** They currently inherit ReBox's receiver privileges;
 process separation isolates crashes, not malicious code. Management API is
 privileged. Pairing does not secure the existing root shell/TFTP services or
 provide encryption against a hostile LAN. Use a trusted isolated network.
+
+## Jellyfin migration checkpoint
+
+The Jellyfin module now implements the generic root (All titles, Continue
+Watching, libraries), folder/search results, artwork, quality fields, and auth
+actions. Its process owns Quick Connect, the persisted device/token state,
+PlaybackInfo, relay gating, seek, long-pause restart, and decoder-drain timing.
+A seek or long-pause resume returns a replacement stream plan; it never starts
+the vendor player itself. Core validates replacement plans through the same
+path as initial playback, cancels the prior proxy epoch, and commits a new
+generation only after the decoder accepts the new stream.
+
+The module deliberately reuses `/var/hr54-persist/jellyfin` when that existing,
+receiver-owned directory is present. There is no move, deletion, or rewrite of
+its existing token/device ID as a migration step. Host fixtures use the supplied
+module-data directory. Legacy field/route adapters live in `reboxd/compat.c`;
+legacy response shapes are serialized by the same Jellyfin implementation.
+During the incremental migration only, the old daemon build includes that
+module-owned source; it no longer maintains another copy of those functions.
+The production payload still starts the old daemon until the other migrations
+and packaging changes are complete.
+
+The threaded module SDK serves up to eight requests so a stream does not block
+status or Stop. Core likewise reserves bounded request workers, publishes a
+read-only registry snapshot, and allows cancellation while preparation is in
+progress. Proxy buffers are 32 KiB and responses are capped; streams are never
+buffered whole. An internal session epoch prevents an old disconnected stream
+from clearing a newer session. Module `/status` may report
+`"playback":{"session":"opaque-session","playing":false}` after decoder drain
+so core can retire the matching session. Transport RPC bodies carry the core's
+current `session`; modules must ignore stale-session stop requests.
+
+Validation for this checkpoint:
+
+```sh
+make -C source/hr54-re/reboxd test
+bash source/hr54-re/jellyfin/remote/test/run_host_tests.sh
+ZIG_GLOBAL_CACHE_DIR=/tmp/rebox-zig-cache \
+ZIG_LOCAL_CACHE_DIR=/tmp/rebox-zig-local \
+sh source/hr54-re/reboxd/build-receiver.sh
+```
+
+The host build uses a mocked vendor decoder only; the real Unix socket relay is
+exercised against the local Jellyfin fixture. The MIPS core and Jellyfin module
+cross-compile, but the receiver download helper currently cannot link in this
+checkout because the extracted vendor `libcurl.so.4.4.0` is absent. No payload
+binary or distribution checksum has been replaced with an unbuilt artifact.

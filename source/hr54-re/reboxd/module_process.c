@@ -1,6 +1,5 @@
 #include "module_process.h"
 #include "module_rpc.h"
-#include <sys/prctl.h>
 static char sockets[80];
 int rb_process_init(const char *path){if(strlen(path)>=sizeof sockets||rb_mkdir(path))return -1;strcpy(sockets,path);return 0;}
 static int identity(const ReboxModule *m) {
@@ -32,7 +31,7 @@ int rb_process_start(ReboxRegistry *r,ReboxModule *m,int manual) {
     snprintf(eid,sizeof eid,"REBOX_MODULE_ID=%s",m->id);snprintf(esock,sizeof esock,"REBOX_MODULE_SOCKET=%s",m->socket);snprintf(edata,sizeof edata,"REBOX_MODULE_DATA=%s",data);
     char *env[]={eid,esock,edata,"REBOX_MODULE_API=1","PATH=/bin:/usr/bin",NULL};char *argv[]={m->executable,NULL};
     pid_t owner=getpid(),pid=fork();
-    if(!pid){prctl(PR_SET_PDEATHSIG,SIGTERM);if(getppid()!=owner)_exit(127);dup2(output,1);dup2(output,2);int null=open("/dev/null",O_RDONLY);if(null>=0)dup2(null,0);for(int i=3;i<65536;i++)close(i);execve(m->executable,argv,env);_exit(127);}
+    if(!pid){if(getppid()!=owner)_exit(127);dup2(output,1);dup2(output,2);int null=open("/dev/null",O_RDONLY);if(null>=0)dup2(null,0);for(int i=3;i<65536;i++)close(i);execve(m->executable,argv,env);_exit(127);}
     close(output);if(pid<0)return fail("module launch failed");m->pid=pid;m->started=mono_now();
     double deadline=m->started+4;
     while(mono_now()<deadline){int status;pid_t exitpid=waitpid(pid,&status,WNOHANG);if(exitpid==pid){m->pid=0;break;}

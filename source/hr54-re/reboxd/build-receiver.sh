@@ -8,7 +8,7 @@ cd "$here"
 mkdir -p build/receiver
 "$rebox_zig" cc -target mips-linux-musleabi -mcpu=mips32 -static -O2 -DREBOX_RECEIVER \
   -o build/receiver/reboxd main.c http.c json.c files.c module_manifest.c module_registry.c \
-  module_rpc.c module_process.c module_auth.c package.c module_manager.c playback.c -pthread -lm
+  module_rpc.c module_process.c module_auth.c package.c module_manager.c playback.c system.c compat.c -pthread -lm
 "$rebox_zig" cc -target mips-linux-musleabi -mcpu=mips32 -O2 -fno-stack-protector \
   -DREBOX_RECEIVER -DHR54_UCLIBC_START -nostdlib -Wl,-e,__start \
   -Wl,--dynamic-linker=/lib/ld-uClibc.so.0 -Wl,--allow-shlib-undefined \

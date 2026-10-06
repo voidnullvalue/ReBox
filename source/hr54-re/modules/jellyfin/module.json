@@ -1,0 +1,1 @@
+{"schema":1,"id":"jellyfin","name":"Jellyfin","version":"0.1.0","description":"Browse and play a Jellyfin library","moduleApi":1,"minReboxApi":1,"kind":"media","entrypoint":"bin/module","capabilities":{"browse":true,"search":true,"settings":true,"auth":true,"playback":true},"ui":{"homeDescription":"Movies, shows and music","order":100}}
