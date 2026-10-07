@@ -69,10 +69,14 @@ static void handle(int fd,const RbRequest *request){
 }
 static void *updater(void *unused){(void)unused;for(;;){pthread_mutex_lock(&operation_mutex);if(automatic_updates)yt_maybe_update();pthread_mutex_unlock(&operation_mutex);nap(1);}return NULL;}
 int main(void){persist_root=getenv("REBOX_MODULE_DATA");if(!persist_root)return 2;
-#ifndef REBOX_HOST_TEST
-    struct stat legacy;if(!lstat("/var/hr54-persist/jellyfin",&legacy)&&S_ISDIR(legacy.st_mode)&&legacy.st_uid==geteuid())persist_root="/var/hr54-persist/jellyfin";
-#endif
     const char *dirs[]={"youtube","state"};for(size_t i=0;i<2;i++){char p[1024];snprintf(p,sizeof p,"%s/%s",persist_root,dirs[i]);if(rb_mkdir(p))return 1;}
+#ifndef REBOX_HOST_TEST
+    /* Copy current private runtime/auth once; never move or replace legacy data. */
+    const char *keep[]={"youtube/bin","youtube/python","youtube/yt-dlp.zip","youtube/version","youtube/cookies.txt","youtube/update-status.json","youtube/yt-dlp.conf","state/youtube-state.json","state/youtube-settings.json"};
+    for(size_t i=0;i<sizeof keep/sizeof keep[0];i++){char from[1024],to[1024];snprintf(from,sizeof from,"/var/hr54-persist/jellyfin/%s",keep[i]);snprintf(to,sizeof to,"%s/%s",persist_root,keep[i]);if(rb_module_copy_defaults(from,to))return 1;}
+#endif
+    if(rb_module_seed("default-data",""))return 1;
+    if(getenv("REBOX_MODULE_SEED_ONLY"))return 0;
     char config[1024];size_t n;snprintf(config,sizeof config,"%s/state/youtube-settings.json",persist_root);char *raw=rb_read(config,4096,&n);struct jval *v=raw?json_parse(raw,n):NULL;automatic_updates=jbool(jget(v,"automaticUpdates"),1);jfree(v);free(raw);
     pthread_t updates;if(!pthread_create(&updates,NULL,updater,NULL))pthread_detach(updates);
     return rb_module_serve(handle);

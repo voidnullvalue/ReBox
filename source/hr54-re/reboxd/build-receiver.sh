@@ -14,4 +14,5 @@ mkdir -p build/receiver
   -Wl,--dynamic-linker=/lib/ld-uClibc.so.0 -Wl,--allow-shlib-undefined \
   -o build/receiver/module-fetch module_fetch.c \
   "$rebox_sysroot/usr/lib/libcurl.so.4.4.0" "$rebox_sysroot/lib/libc.so.0"
-file build/receiver/reboxd build/receiver/module-fetch
+"$rebox_zig" build-exe module_sha.zig -target mips-linux-musleabi -mcpu=mips32 -O ReleaseSmall -femit-bin=build/receiver/module-sha
+file build/receiver/reboxd build/receiver/module-fetch build/receiver/module-sha

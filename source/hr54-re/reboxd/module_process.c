@@ -27,9 +27,10 @@ int rb_process_start(ReboxRegistry *r,ReboxModule *m,int manual) {
     if(snprintf(m->socket,sizeof m->socket,"%s/%s.sock",sockets,m->id)>=(int)sizeof m->socket)return fail("module socket path exceeds limit");
     unlink(m->socket);snprintf(logfile,sizeof logfile,"%s.log",m->id);rb_path(log,sizeof log,r->root,"log",logfile);
     int output=open(log,O_WRONLY|O_APPEND|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0600);if(output<0)return fail("module log unavailable");
-    char eid[100],esock[160],edata[REBOX_PATH_MAX+24];
+    char eid[100],esock[160],edata[REBOX_PATH_MAX+24],epackage[REBOX_PATH_MAX+24],package[REBOX_PATH_MAX];
     snprintf(eid,sizeof eid,"REBOX_MODULE_ID=%s",m->id);snprintf(esock,sizeof esock,"REBOX_MODULE_SOCKET=%s",m->socket);snprintf(edata,sizeof edata,"REBOX_MODULE_DATA=%s",data);
-    char *env[]={eid,esock,edata,"REBOX_MODULE_API=1","PATH=/bin:/usr/bin",NULL};char *argv[]={m->executable,NULL};
+    if(rb_path(package,sizeof package,r->root,"modules",m->id)){close(output);return -1;}snprintf(epackage,sizeof epackage,"REBOX_MODULE_PACKAGE=%s",package);
+    char *env[]={eid,esock,edata,epackage,"REBOX_MODULE_API=1","PATH=/bin:/usr/bin",NULL};char *argv[]={m->executable,NULL};
     pid_t owner=getpid(),pid=fork();
     if(!pid){if(getppid()!=owner)_exit(127);dup2(output,1);dup2(output,2);int null=open("/dev/null",O_RDONLY);if(null>=0)dup2(null,0);for(int i=3;i<65536;i++)close(i);execve(m->executable,argv,env);_exit(127);}
     close(output);if(pid<0)return fail("module launch failed");m->pid=pid;m->started=mono_now();

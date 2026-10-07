@@ -1,7 +1,7 @@
 /* Returns 0 on success, -1 if the path would not fit. */
 static int doom_path(char *out, size_t n, const char *rel) {
 #ifdef REBOX_DOOM_MODULE
-    const char *root=!strcmp(rel,"bin/hr54-doom-native")&&*package_engine?package_engine:NULL;
+    const char *root=!strcmp(rel,"bin/hr54-doom-native")&&*package_engine?package_engine:!strcmp(rel,"data/doom1.wad")&&*package_wad?package_wad:NULL;
     int k=root?snprintf(out,n,"%s",root):snprintf(out,n,"%s/doom/%s",persist_root,rel);
 #else
     int k = snprintf(out, n, "%s/doom/%s", persist_root, rel);

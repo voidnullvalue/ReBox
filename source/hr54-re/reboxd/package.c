@@ -9,7 +9,7 @@ static pid_t command_pipe(int *fd,const char *exe,char *const argv[]) {
 static int finish(pid_t pid,int fd){close(fd);int status;pid_t rc;do{rc=waitpid(pid,&status,0);}while(rc<0&&errno==EINTR);return rc==pid&&WIFEXITED(status)&&!WEXITSTATUS(status)?0:-1;}
 int rb_package_sha(const char *path,char sha[65]) {
 #ifdef REBOX_RECEIVER
-    char *argv[]={"/bin/busybox","sha256sum",(char *)path,NULL};
+    char *argv[]={"/var/hr54-persist/rebox/bin/module-sha",(char *)path,NULL};
 #else
     char *argv[]={"/usr/bin/sha256sum",(char *)path,NULL};
 #endif

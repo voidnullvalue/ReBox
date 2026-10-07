@@ -84,9 +84,11 @@ released:jfree(body);free(out.p);pthread_mutex_unlock(&operation_mutex);
 static void *clock_start(void *unused){(void)unused;iptv_clock_bootstrap();return NULL;}
 int main(int argc,char **argv){(void)argc;persist_root=getenv("REBOX_MODULE_DATA");if(!persist_root)return 2;
 #ifndef REBOX_HOST_TEST
-    struct stat legacy;if(!lstat("/var/hr54-persist/jellyfin",&legacy)&&S_ISDIR(legacy.st_mode)&&legacy.st_uid==geteuid())persist_root="/var/hr54-persist/jellyfin";
+    struct stat legacy;if(!lstat("/var/hr54-persist/jellyfin/iptv",&legacy)&&S_ISDIR(legacy.st_mode)&&legacy.st_uid==geteuid())persist_root="/var/hr54-persist/jellyfin";
 #endif
     char executable[1024];if(!realpath(argv[0],executable))return 1;char *slash=strrchr(executable,'/');if(!slash)return 1;*slash=0;slash=strrchr(executable,'/');if(!slash)return 1;*slash=0;snprintf(package_root,sizeof package_root,"%s",executable);
+    if(rb_module_seed("default-data",""))return 1;
+    if(getenv("REBOX_MODULE_SEED_ONLY"))return 0;
     const char *dirs[]={"iptv","state"};for(size_t i=0;i<2;i++){char p[1024];snprintf(p,sizeof p,"%s/%s",persist_root,dirs[i]);if(rb_mkdir(p))return 1;}iptv_reload();
 #ifndef REBOX_HOST_TEST
     pthread_t clock_worker;if(!pthread_create(&clock_worker,NULL,clock_start,NULL))pthread_detach(clock_worker);

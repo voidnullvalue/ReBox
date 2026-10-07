@@ -10,8 +10,16 @@ static int yt_active(const char *token){state_lock();int ok=S->yt_active&&!strcm
 static void yt_reap(pid_t pid){if(pid<=1)return;kill(-pid,SIGKILL);kill(pid,SIGKILL);while(waitpid(pid,NULL,0)<0&&errno==EINTR){}char dir[160],path[180];snprintf(dir,sizeof dir,"/tmp/hr54-youtube-%ld",(long)pid);snprintf(path,sizeof path,"%s/video",dir);unlink(path);snprintf(path,sizeof path,"%s/audio",dir);unlink(path);rmdir(dir);}
 static pid_t yt_spawn(int *readfd,const char *mode,const char *arg,const char *page,int relay){
  char root[512],exe[512],script[512],home[512],ca[512];snprintf(root,sizeof root,"%s/youtube",persist_root);snprintf(exe,sizeof exe,"%s/bin/%s",root,relay?"relay":"python");snprintf(script,sizeof script,"%s/resolver.pyc",root);snprintf(home,sizeof home,"%s/python",root);snprintf(ca,sizeof ca,"%s/iptv/ca-certificates.crt",persist_root);
+
+#if defined(REBOX_YOUTUBE_MODULE) && !defined(REBOX_HOST_TEST)
+ const char *package=getenv("REBOX_MODULE_PACKAGE");if(package){snprintf(script,sizeof script,"%s/bin/resolver.pyc",package);if(relay)snprintf(exe,sizeof exe,"%s/bin/relay",package);snprintf(ca,sizeof ca,"%s/youtube/ca-certificates.crt",persist_root);}
+#endif
  if(access(exe,X_OK)||(!relay&&access(script,R_OK))){fail("Resolver unavailable");return -1;}int p[2];if(pipe(p)){fail("Unable to create YouTube pipe");return -1;}pid_t owner=getpid(),pid=fork();if(pid<0){close(p[0]);close(p[1]);return -1;}
- if(!pid){setpgid(0,0);prctl(PR_SET_PDEATHSIG,SIGKILL);if(getppid()!=owner)_exit(127);alarm(0);dup2(p[1],1);close(p[0]);close(p[1]);for(int i=3;i<1024;i++)close(i);setenv("PYTHONHOME",home,1);setenv("REBOX_YOUTUBE_RUNTIME",root,1);setenv("SSL_CERT_FILE",ca,1);setenv("PYTHONDONTWRITEBYTECODE","1",1);if(relay)execl(exe,exe,arg,page,(char *)NULL);else execl(exe,exe,script,mode,arg,page,(char *)NULL);_exit(127);}setpgid(pid,pid);close(p[1]);*readfd=p[0];return pid;
+ if(!pid){setpgid(0,0);prctl(PR_SET_PDEATHSIG,SIGKILL);if(getppid()!=owner)_exit(127);alarm(0);dup2(p[1],1);close(p[0]);close(p[1]);for(int i=3;i<1024;i++)close(i);setenv("PYTHONHOME",home,1);setenv("REBOX_YOUTUBE_RUNTIME",root,1);
+#ifdef REBOX_YOUTUBE_MODULE
+const char *package=getenv("REBOX_MODULE_PACKAGE");if(package){char fetch[1024];snprintf(fetch,sizeof fetch,"%s/bin/fetch",package);setenv("REBOX_YOUTUBE_FETCH",fetch,1);}
+#endif
+setenv("SSL_CERT_FILE",ca,1);setenv("PYTHONDONTWRITEBYTECODE","1",1);if(relay)execl(exe,exe,arg,page,(char *)NULL);else execl(exe,exe,script,mode,arg,page,(char *)NULL);_exit(127);}setpgid(pid,pid);close(p[1]);*readfd=p[0];return pid;
 }
 static int yt_resolve(const char *mode,const char *arg,const char *page,const char *token,struct sb *out){
  int fd;pid_t pid=yt_spawn(&fd,mode,arg,page,0);if(pid<0)return -1;double until=mono_now()+60;int rc=0;char buf[8192];for(;;){if(!yt_active(token)){rc=fail("YouTube cancelled");break;}if(mono_now()>until){rc=fail("YouTube resolver timed out");break;}struct pollfd p={fd,POLLIN,0};int n=poll(&p,1,100);if(n<0&&errno==EINTR)continue;if(n<0){rc=-1;break;}if(!n)continue;ssize_t k=read(fd,buf,sizeof buf);if(k<0&&errno==EINTR)continue;if(k<=0){if(k<0)rc=-1;break;}if(out->len+(size_t)k>32768){rc=fail("YouTube response exceeds bounds");break;}if(sb_putn(out,buf,k)){rc=-1;break;}}
@@ -64,6 +72,14 @@ int busy=S->playing||S->iptv_active||S->yt_active;
 #endif
 state_unlock();if(busy)return;
  char root[512],exe[512],script[512],stamp[512],home[512],ca[512];snprintf(root,sizeof root,"%s/youtube",persist_root);snprintf(exe,sizeof exe,"%s/bin/python",root);snprintf(script,sizeof script,"%s/updater.pyc",root);snprintf(stamp,sizeof stamp,"%s/update-status.json",root);snprintf(home,sizeof home,"%s/python",root);snprintf(ca,sizeof ca,"%s/iptv/ca-certificates.crt",persist_root);struct stat st;
+
+#if defined(REBOX_YOUTUBE_MODULE) && !defined(REBOX_HOST_TEST)
+ const char *package=getenv("REBOX_MODULE_PACKAGE");if(package){snprintf(script,sizeof script,"%s/bin/updater.pyc",package);snprintf(ca,sizeof ca,"%s/youtube/ca-certificates.crt",persist_root);}
+#endif
  if(access(exe,X_OK)||access(script,R_OK))return;if(!stat(stamp,&st)&&time(NULL)-st.st_mtime<7*86400)return;
- pid_t owner=getpid(),pid=fork();if(!pid){setpgid(0,0);prctl(PR_SET_PDEATHSIG,SIGKILL);if(getppid()!=owner)_exit(127);alarm(360);for(int i=0;i<1024;i++)close(i);int null=open("/dev/null",O_RDWR);dup2(null,0);dup2(null,1);dup2(null,2);if(null>2)close(null);setenv("PYTHONHOME",home,1);setenv("REBOX_YOUTUBE_RUNTIME",root,1);setenv("SSL_CERT_FILE",ca,1);execl(exe,exe,script,(char *)NULL);_exit(127);}if(pid>0)S->yt_updater=pid;
+ pid_t owner=getpid(),pid=fork();if(!pid){setpgid(0,0);prctl(PR_SET_PDEATHSIG,SIGKILL);if(getppid()!=owner)_exit(127);alarm(360);for(int i=0;i<1024;i++)close(i);int null=open("/dev/null",O_RDWR);dup2(null,0);dup2(null,1);dup2(null,2);if(null>2)close(null);setenv("PYTHONHOME",home,1);setenv("REBOX_YOUTUBE_RUNTIME",root,1);
+#ifdef REBOX_YOUTUBE_MODULE
+const char *package=getenv("REBOX_MODULE_PACKAGE");if(package){char fetch[1024];snprintf(fetch,sizeof fetch,"%s/bin/fetch",package);setenv("REBOX_YOUTUBE_FETCH",fetch,1);}
+#endif
+setenv("SSL_CERT_FILE",ca,1);execl(exe,exe,script,(char *)NULL);_exit(127);}if(pid>0)S->yt_updater=pid;
 }
