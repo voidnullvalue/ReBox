@@ -15,7 +15,7 @@
 
 ReBox is a replacement userland shell for the DIRECTV HR54-700. It keeps the useful vendor plumbing — Linux, the Broadcom media stack, HDMI, RF remote support and the existing compositor — and replaces the part I actually care about: what the box does after it boots.
 
-Right now that means a custom native UI, a LAN API, Jellyfin playback, IPTV, YouTube, a Frigate viewer, native Doom, and an Android controller. The goal is not to turn the HR54 into a generic Linux PC. The vendor media stack already does the hard hardware-specific work. 
+Right now that means a custom native UI, a LAN API, a runtime module system, Jellyfin, IPTV, YouTube, a Frigate viewer, native Doom, and an Android controller. The goal is not to turn the HR54 into a generic Linux PC. The vendor media stack already does the hard hardware-specific work.
 
 > [!WARNING]
 > **ReBox is early alpha software.**
@@ -28,19 +28,46 @@ Right now that means a custom native UI, a LAN API, Jellyfin playback, IPTV, You
 
 - native ReBox Home UI running directly on the receiver
 - RF remote input through the ReBox input broker
+- runtime module discovery and generic module-driven navigation
+- module enable/disable, bundled reinstall, uninstall-with-data-preserved and URL installation
 - Jellyfin browsing and playback through the receiver's vendor media path
-- pause/resume, replacement playback and stop back to ReBox Home on the physically accepted build
-- IPTV from a user-supplied M3U when the stream is compatible with the box
-- receiver-native YouTube extraction/runtime using Python, QuickJS, yt-dlp and FFmpeg helpers
-- Frigate camera viewer
+- IPTV playback from user-supplied M3U playlists when the stream is compatible with the box
+- receiver-native YouTube search/extraction/playback using Python, QuickJS, yt-dlp and FFmpeg helpers
+- Frigate camera discovery and live playback through the module relay
+- pause/resume, replacement playback and stop back to ReBox Home
 - native Doom
 - Android controller talking directly to the receiver API
+- Android runtime module discovery and module management
 - local Whisper voice input in the Android controller
 - root shell/file-transfer tooling for development and recovery
 
 Doom's sound is **known not to work right now**. Doom itself runs, but the audio path is unfinished/broken. That is a known alpha issue, not a configuration problem you are expected to solve.
 
-Some other paths also have limitations. YouTube extraction can break when upstream changes, IPTV is limited by what the receiver can actually decode, Frigate is still built around a compile-time server target, and the Android APK is currently a debug build. The detailed list lives in [Build and limitations](docs/BUILD-AND-LIMITS.md).
+Some paths still have limitations. YouTube extraction can break when upstream changes, IPTV is limited by what the receiver can actually decode, Frigate playback expects a compatible H.264/AAC source path, and the Android APK is currently a debug build. The detailed list lives in [Build and limitations](docs/BUILD-AND-LIMITS.md).
+
+## modules
+
+ReBox now has a runtime module architecture instead of baking every provider directly into the shell.
+
+The current bundled **core modules** are:
+
+- Jellyfin
+- IPTV
+- YouTube
+- Frigate
+- Doom
+
+Core modules are trusted packages shipped with ReBox. They are discovered at runtime and can be enabled or disabled through the same module-management path used by other modules. Missing bundled modules can be restored from the receiver's trusted offline catalog.
+
+The native UI and Android controller do not need provider-specific Home-screen code. They discover module descriptors and capabilities at runtime and render browsing, search, settings, actions, playback or native-app controls from that contract.
+
+Media modules run out of process and communicate with ReBox core over private Unix sockets. Modules prepare playback plans and provide stream data; ReBox core owns decoder arbitration and the actual vendor `playURL` path. This keeps one provider from owning the receiver's playback lifecycle.
+
+Modules use the `.rbox` package format: a gzip-compressed POSIX ustar archive containing a bounded `module.json` manifest and the module executable/assets. Package installation is staged and transactional, and a newly installed module must pass its health handshake before activation.
+
+Third-party modules can be installed by URL through the management API/UI, but they are **receiver-side native code**, not browser extensions or sandboxed scripts. Only install modules from sources you trust.
+
+The complete API, package format, lifecycle, management authorization and module-development contract are documented in [docs/MODULES.md](docs/MODULES.md).
 
 ## what this actually changes
 
@@ -111,41 +138,49 @@ The root hook exposes:
 - writable TFTP on UDP **1069**
 - ReBox API on TCP **8130**, which is not an authenticated multi-user security boundary
 
-The portable hook restricts those services to IPv4 loopback/private/link-local source ranges, but another hostile device on the same LAN is still a hostile device.
+Module-management mutations use pairing/bearer authorization, but that does not turn the existing root shell, TFTP service or LAN API into hardened Internet-facing services. Third-party modules also currently inherit receiver privileges.
+
+The portable hook restricts services to IPv4 loopback/private/link-local source ranges, but another hostile device on the same LAN is still a hostile device.
 
 Use a trusted or isolated LAN/VLAN. Do not port-forward these services to the Internet. Read [docs/SECURITY.md](docs/SECURITY.md) before deploying the box anywhere you do not fully control.
 
 ## repo layout
 
-| Path | What is in it |ReBox uses it instead of pretending it does not exist.
+| Path | What is in it |
 | --- | --- |
 | `android/ReBox-controller.apk` | Current Android controller APK |
-| `receiver/payload/hr54-persist/` | Native UI, input broker, API/backend, `playURL` wrapper, Doom and media runtimes |
+| `receiver/payload/hr54-persist/` | Receiver payload, native UI, input broker, API/backend and media runtime assets |
+| `source/hr54-re/modules/` | Jellyfin, IPTV, YouTube, Frigate, Doom, shared module support and test module source |
+| `source/hr54-re/reboxd/` | ReBox core daemon, module registry/manager, playback arbitration and management API |
+| `source/hr54-re/hr54-ui/` | Generic receiver-native UI driven by runtime module descriptors |
 | `stock-bootstrap/` | Stock asset-7 boot hook, genuine anchor and big-endian MIPS helper environment |
+| `tools/build-module.py` | Build/package helper for `.rbox` modules |
+| `tools/build-runtime-bundle.py` | Runtime bundle/catalog builder |
 | `tools/prepare-stock-image.sh` | Offline installer for a **cloned** stock `/var` image |
 | `tools/activate-native.sh` | Guarded receiver-side native activation |
 | `tools/deactivate-native.sh` | Restore the backed-up stock presentation on reboot |
 | `tools/recv/` | Root-shell and file-transfer helpers |
-| `source/hr54-re/` | Receiver UI/backend/Doom source, build scripts and minimal vendor sysroot |
 | `source/android/` | Android controller source, vendored Whisper code and voice model |
 | `SHA256SUMS` | Integrity manifest for the public bundle |
 
 ## docs worth reading
 
+- [Module architecture and API](docs/MODULES.md)
 - [Stock installation](docs/STOCK-INSTALL.md)
 - [Security and privacy](docs/SECURITY.md)
 - [Rollback](docs/ROLLBACK.md)
 - [Android controller](docs/ANDROID.md)
 - [Physical/API acceptance](docs/ACCEPTANCE.md)
 - [Build and known limits](docs/BUILD-AND-LIMITS.md)
+- [Playback investigation and fixes](docs/PLAYBACK-20261007.md)
 - [Package validation](docs/VALIDATION.md)
 
 ## current validation boundary
 
-The repaired core build has been physically accepted on one HR54-700 for native navigation, Jellyfin HDMI video/audio, MENU/EXIT, combined pause/resume, replacement playback and stop-to-Home. A warm reboot also returned to ReBox Home with physical remote input working.
+The runtime-module build has been physically exercised on the development HR54-700 with Jellyfin, IPTV, YouTube and Frigate playback working through the receiver's vendor media path. Native navigation, RF input, playback replacement/stop behavior and Doom are also exercised on that receiver.
 
-That does not mean every path has been re-tested after every change. Cold boot behavior, every remote code, every optional media source and every other HR54 firmware revision are not magically proven because one box works.
+That does not mean every path has been re-tested after every change. Cold boot behavior, every remote code, every possible upstream media format and every other HR54 firmware revision are not magically proven because one box works.
 
-The new portable stock packaging and installer have passed offline checks against a cloned stock image. They still need acceptance on another physical stock receiver.
+The portable stock packaging and installer have passed offline checks against a cloned stock image. They still need acceptance on another physical stock receiver.
 
 That is why the badge at the top says **EARLY ALPHA**.
