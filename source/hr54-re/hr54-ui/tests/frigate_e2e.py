@@ -21,7 +21,7 @@ try:
         time.sleep(.1)
     state=h.get('/api/state');assert state['playing'] and state['source']=='frigate' and state['itemId']=='Front',state
     keys('x');assert not h.get('/api/state')['playing'];assert p.poll() is None
-    print('PASS Frigate through generic native UI: dynamic Home, ordinary camera items, direct-plan playback and stop')
+    print('PASS Frigate through generic native UI: dynamic Home, ordinary camera items, proxy-plan playback and stop')
 finally:
     if p:p.terminate();p.wait(timeout=10);p.stdin.close()
     h.doCleanups()

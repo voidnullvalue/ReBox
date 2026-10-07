@@ -42,5 +42,14 @@ def search():
  entries=[x for x in d.get('entries',[]) if x and re.fullmatch(r'[A-Za-z0-9_-]{11}',x.get('id') or '')]
  return {'page':page,'hasMore':len(entries)>6,'results':[{'id':x['id'],'title':str(x.get('title') or x['id'])[:180],'channel':str(x.get('uploader') or x.get('channel') or '')[:100],'duration':x.get('duration')} for x in entries[:6]]}
 try:result=resolve() if sys.argv[1]=='play' else search()
-except (DownloadError,ValueError,Exception) as e:result={'error':str(e).replace('\n',' ')[:240]}
+except Exception as e:
+ # yt-dlp errors can include signed CDN URLs or authentication data. Persist
+ # only a category; the bounded error response remains available to the RPC.
+ message=str(e).lower()
+ category=('tls' if any(x in message for x in ('certificate','ssl','tls')) else
+           'format' if isinstance(e,ValueError) else
+           'authentication' if any(x in message for x in ('sign in','private','bot','login')) else
+           'extraction')
+ print('YouTube resolver failed stage='+category,file=sys.stderr)
+ result={'error':str(e).replace('\n',' ')[:240]}
 print(json.dumps(result,separators=(',',':')))

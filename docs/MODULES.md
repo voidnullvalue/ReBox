@@ -433,3 +433,21 @@ startup/bundles still require packaging work. Real media decoding, exclusive
 native presentation, phone LAN / microphone permissions and on-device speech
 remain physical acceptance work.
 See `source/android/README.md` for the client workflow and build commands.
+
+## HR54 playback correction — 2026-10-07
+
+Frigate now uses the exposed `/live/mse/api/ws?src=<configured-stream>` route
+and copies H.264/AAC fMP4 packets into MPEG-TS inside its own module. The
+previous web-root `/stream.ts` route returned the HTML application on the
+configured 0.18 server. The module returns a `moduleProxy` plan and core uses
+the same decoder arbitration/TS validation as Jellyfin, IPTV and YouTube.
+No new encoder, decoder, camera URL exposure or external transcoder is added.
+
+The Frigate helper links the same minimal FFmpeg 8.0 libraries as YouTube.
+Configure/build those libraries with `jellyfin/youtube/build-remux.sh` in an
+unpacked FFmpeg 8.0 tree, then set `HR54_FFMPEG_BUILD` to that directory when
+running `modules/frigate/build-receiver.sh` or `tools/build-runtime-bundle.py`.
+Host relay tests need FFmpeg development libraries (`pkg-config libavformat
+libavcodec libavutil`) plus `ffmpeg`/`ffprobe` for a real fMP4 fixture.
+
+See [the playback investigation and receiver evidence](PLAYBACK-20261007.md).

@@ -78,6 +78,7 @@ static int start_decoder(const Playback *next) {
     char url[2048];
     if(*next->url)strcpy(url,next->url);
     else snprintf(url, sizeof url, "http://127.0.0.1:%d/module-stream/%s/%s", listen_port, next->module, next->token);
+    fprintf(stderr,"reboxd: %s player=/var/opt/hr54/bin/hr54-play-url stream=%s URL=%s\n",next->module,*next->url?"direct HTTP":"moduleProxy MPEG-TS",*next->url?"[redacted]":"http://127.0.0.1/module-stream/[module]/[session]");
     pid_t child = fork();
     if (!child) {
         char *argv[] = {"/var/opt/hr54/bin/hr54-play-url", url, NULL};
@@ -85,7 +86,7 @@ static int start_decoder(const Playback *next) {
         for (int i = 3; i < 65536; i++) close(i);
         execve(argv[0], argv, env); _exit(127);
     }
-    if (child < 0) goto failed;
+    if (child < 0){fprintf(stderr,"reboxd: %s player fork failed errno=%d\n",next->module,errno);goto failed;}
     int status = 0; double deadline = mono_now() + 60; pid_t result;
     do {
         result = waitpid(child, &status, WNOHANG);
@@ -95,13 +96,15 @@ static int start_decoder(const Playback *next) {
     if (result != child) {
         /* An unreaped direct child cannot have its PID reused. */
         kill(child, SIGKILL); while (waitpid(child, &status, 0) < 0 && errno == EINTR) {}
+        fprintf(stderr,"reboxd: %s player cancelled or timed out\n",next->module);
         goto failed;
     }
+    fprintf(stderr,"reboxd: %s player exit=%d signal=%d\n",next->module,WIFEXITED(status)?WEXITSTATUS(status):-1,WIFSIGNALED(status)?WTERMSIG(status):0);
     if (!WIFEXITED(status) || WEXITSTATUS(status)) goto failed;
     deadline = mono_now() + 15;
     while (current(next->epoch)) {
         if (*next->url || snapshot().claimed) break;
-        if (mono_now() > deadline) goto failed;
+        if (mono_now() > deadline){fprintf(stderr,"reboxd: %s player did not claim MPEG-TS stream\n",next->module);goto failed;}
         nap(.05);
     }
     pthread_mutex_unlock(&decoder_lock); return 0;
@@ -183,8 +186,9 @@ int rb_play(ReboxRegistry *r, ReboxModule *m, const char *body, struct sb *out) 
     if (!rb_rpc(m, "POST", "/play", body, &reply, 120)) {
         struct jval *plan = json_parse(reply.body.p, reply.body.len);
         rc = reply.status == 200 ? commit_plan(&next, plan, out) : reply.status;
+        if(rc!=200)fprintf(stderr,"reboxd: %s preparation failed moduleHTTP=%d playbackHTTP=%d\n",m->id,reply.status,rc);
         jfree(plan); rb_reply_free(&reply);
-    }
+    }else fprintf(stderr,"reboxd: %s playback preparation RPC failed\n",m->id);
     if (rc != 200) { cancel(next.epoch); cleanup(m, next.session); stop_decoder(next.epoch); }
     return rc;
 }
@@ -307,6 +311,7 @@ void rb_stream_proxy(int client, const char *path) {
     }
     close(fd);
     if (!sent) rb_http_error(client, 502, "module stream failed");
+    if(failed)fprintf(stderr,"reboxd: %s proxy failed upstreamHTTP=%d headerReady=%d mediaStarted=%d\n",s.module,status,ready,sent);
     /* EOF precedes decoder drain. The module reports final completion through
      * status; any I/O failure cancels only this preparation/session epoch. */
     if ((failed || (!eof && current(s.epoch))) && current(s.epoch)) {

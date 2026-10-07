@@ -42,7 +42,9 @@ int main(int argc,char **argv){
  OPT(52,1L);OPT(68,5L);OPT(181,3L);OPT(182,!strncmp(argv[1],"https://",8)?2L:3L);
  OPT(78,12L);OPT(13,atol(argv[5]));OPT(45,1L);OPT(19,1L);OPT(20,15L);OPT(99,1L);
  OPT(10018,*argv[3]?argv[3]:"HR54-IPTV/1");if(*argv[4])OPT(10016,argv[4]);
- int rc=curl_easy_perform(handle);if(rc)fprintf(stderr,"IPTV fetch: %s\n",curl_easy_strerror(rc));curl_easy_cleanup(handle);return rc?1:0;
+ int rc=curl_easy_perform(handle);long status=0;curl_easy_getinfo(handle,0x200002,&status);
+ if(rc||status<200||status>=300)fprintf(stderr,"Media fetch: curl=%d (%s) HTTP=%ld bodyStarted=%d\n",rc,curl_easy_strerror(rc),status,sent);
+ curl_easy_cleanup(handle);return rc||status<200||status>=300?1:0;
 }
 #ifdef HR54_UCLIBC_START
 extern void __uClibc_main(int (*)(int,char **),int,char **,void *,void *,void *,void *);

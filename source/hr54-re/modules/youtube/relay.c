@@ -22,7 +22,7 @@ static pid_t fetch(const char *url,const char *fifo){
  char buf[32768];ssize_t n;long bytes=0;
  while((n=read(pf[0],buf,sizeof buf))>0){ssize_t at=0;while(at<n){ssize_t w=write(b,buf+at,n-at);if(w<0&&errno==EINTR)continue;if(w<=0){reap(helper);_exit(1);}at+=w;}bytes+=n;}
  close(b);close(pf[0]);int status=0;while(waitpid(helper,&status,0)<0&&errno==EINTR){}
- fprintf(stderr,"YouTube HTTPS feeder bytes=%ld status=%d\n",bytes,status);_exit(n<0||status?1:0);
+ fprintf(stderr,"YouTube HTTPS feeder bytes=%ld exit=%d signal=%d\n",bytes,WIFEXITED(status)?WEXITSTATUS(status):-1,WIFSIGNALED(status)?WTERMSIG(status):0);_exit(n<0||status?1:0);
 }
 int main(int argc,char **argv){
  if(argc!=3)return 2;

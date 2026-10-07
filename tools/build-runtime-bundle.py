@@ -76,6 +76,8 @@ def main():
             copy(PAYLOAD / 'jellyfin/doom/bin/hr54-doom-native', package / 'bin/hr54-doom-native', True)
             copy(PAYLOAD / 'jellyfin/doom/data', package / 'default-data/doom/data')
             copy(PAYLOAD / 'jellyfin/doom/LICENSE.txt', package / 'LICENSE.txt')
+        elif identity == 'frigate':
+            copy(SRC / 'modules/frigate/build/bin/relay', package / 'bin/relay', True)
         filename = identity + '.rbox'
         digest = builder.package(package, runtime / 'builtin' / filename)
         entries.append(dict(id=identity, name=manifest['name'], package=filename, sha256=digest, defaultEnabled=True))

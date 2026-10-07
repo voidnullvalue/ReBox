@@ -1,4 +1,12 @@
 #include "sdk.h"
+void rb_media_origin(const char *stage,const char *url){
+    const char *scheme=url?strstr(url,"://"):NULL;
+    if(!scheme||(strncmp(url,"http://",7)&&strncmp(url,"https://",8))){fprintf(stderr,"%s URL=[redacted]\n",stage);return;}
+    const char *host=scheme+3;size_t n=strcspn(host,"/?#");
+    const char *at=memchr(host,'@',n);if(at){n-=(size_t)(at+1-host);host=at+1;}
+    if(n>255||strspn(host,"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-:[]")<n){fprintf(stderr,"%s URL=[redacted]\n",stage);return;}
+    fprintf(stderr,"%s URL=%.*s://%.*s/[redacted]\n",stage,(int)(scheme-url),url,(int)n,host);
+}
 static volatile sig_atomic_t quit;
 static pthread_mutex_t count_lock=PTHREAD_MUTEX_INITIALIZER;
 static unsigned clients;

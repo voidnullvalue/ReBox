@@ -7,14 +7,19 @@
 #define YT_DRAIN_GRACE 2.0
 static int yt_valid_id(const char *s){if(!s||strlen(s)!=11)return 0;for(int i=0;i<11;i++)if(!isalnum((unsigned char)s[i])&&s[i]!='_'&&s[i]!='-')return 0;return 1;}
 static int yt_active(const char *token){state_lock();int ok=S->yt_active&&!strcmp(S->yt_token,token);state_unlock();return ok;}
-static void yt_reap(pid_t pid){if(pid<=1)return;kill(-pid,SIGKILL);kill(pid,SIGKILL);while(waitpid(pid,NULL,0)<0&&errno==EINTR){}char dir[160],path[180];snprintf(dir,sizeof dir,"/tmp/hr54-youtube-%ld",(long)pid);snprintf(path,sizeof path,"%s/video",dir);unlink(path);snprintf(path,sizeof path,"%s/audio",dir);unlink(path);rmdir(dir);}
+static int yt_reap(pid_t pid){if(pid<=1)return -1;int status=0;pid_t got=0;
+ /* Give EOF cleanup a bounded chance to exit so stderr/exit diagnostics keep
+  * the worker's real status. Cancellation remains bounded and concurrent. */
+ for(int i=0;i<20;i++){got=waitpid(pid,&status,WNOHANG);if(got!=0)break;nap(.01);}
+ if(got==0){kill(-pid,SIGKILL);kill(pid,SIGKILL);while(waitpid(pid,&status,0)<0&&errno==EINTR){}}
+char dir[160],path[180];snprintf(dir,sizeof dir,"/tmp/hr54-youtube-%ld",(long)pid);snprintf(path,sizeof path,"%s/video",dir);unlink(path);snprintf(path,sizeof path,"%s/audio",dir);unlink(path);rmdir(dir);return got<0?-1:status;}
 static pid_t yt_spawn(int *readfd,const char *mode,const char *arg,const char *page,int relay){
  char root[512],exe[512],script[512],home[512],ca[512];snprintf(root,sizeof root,"%s/youtube",persist_root);snprintf(exe,sizeof exe,"%s/bin/%s",root,relay?"relay":"python");snprintf(script,sizeof script,"%s/resolver.pyc",root);snprintf(home,sizeof home,"%s/python",root);snprintf(ca,sizeof ca,"%s/iptv/ca-certificates.crt",persist_root);
 
 #if defined(REBOX_YOUTUBE_MODULE) && !defined(REBOX_HOST_TEST)
  const char *package=getenv("REBOX_MODULE_PACKAGE");if(package){snprintf(script,sizeof script,"%s/bin/resolver.pyc",package);if(relay)snprintf(exe,sizeof exe,"%s/bin/relay",package);snprintf(ca,sizeof ca,"%s/youtube/ca-certificates.crt",persist_root);}
 #endif
- if(access(exe,X_OK)||(!relay&&access(script,R_OK))){fail("Resolver unavailable");return -1;}int p[2];if(pipe(p)){fail("Unable to create YouTube pipe");return -1;}pid_t owner=getpid(),pid=fork();if(pid<0){close(p[0]);close(p[1]);return -1;}
+ if(access(exe,X_OK)||(!relay&&access(script,R_OK))){fprintf(stderr,"YouTube worker missing path=%s script=%s\n",exe,relay?"[none]":script);fail("Resolver unavailable");return -1;}fprintf(stderr,"YouTube worker path=%s mode=%s script=%s\n",exe,relay?"packet-copy":mode,relay?"[none]":script);int p[2];if(pipe(p)){fail("Unable to create YouTube pipe");return -1;}pid_t owner=getpid(),pid=fork();if(pid<0){close(p[0]);close(p[1]);return -1;}
  if(!pid){setpgid(0,0);prctl(PR_SET_PDEATHSIG,SIGKILL);if(getppid()!=owner)_exit(127);alarm(0);dup2(p[1],1);close(p[0]);close(p[1]);for(int i=3;i<1024;i++)close(i);setenv("PYTHONHOME",home,1);setenv("REBOX_YOUTUBE_RUNTIME",root,1);
 #ifdef REBOX_YOUTUBE_MODULE
 const char *package=getenv("REBOX_MODULE_PACKAGE");if(package){char fetch[1024];snprintf(fetch,sizeof fetch,"%s/bin/fetch",package);setenv("REBOX_YOUTUBE_FETCH",fetch,1);}
@@ -23,7 +28,7 @@ setenv("SSL_CERT_FILE",ca,1);setenv("PYTHONDONTWRITEBYTECODE","1",1);if(relay)ex
 }
 static int yt_resolve(const char *mode,const char *arg,const char *page,const char *token,struct sb *out){
  int fd;pid_t pid=yt_spawn(&fd,mode,arg,page,0);if(pid<0)return -1;double until=mono_now()+60;int rc=0;char buf[8192];for(;;){if(!yt_active(token)){rc=fail("YouTube cancelled");break;}if(mono_now()>until){rc=fail("YouTube resolver timed out");break;}struct pollfd p={fd,POLLIN,0};int n=poll(&p,1,100);if(n<0&&errno==EINTR)continue;if(n<0){rc=-1;break;}if(!n)continue;ssize_t k=read(fd,buf,sizeof buf);if(k<0&&errno==EINTR)continue;if(k<=0){if(k<0)rc=-1;break;}if(out->len+(size_t)k>32768){rc=fail("YouTube response exceeds bounds");break;}if(sb_putn(out,buf,k)){rc=-1;break;}}
- close(fd);yt_reap(pid);if(rc)return rc;struct jval *v=json_parse(out->p,out->len);const char *error=jstr(jget(v,"error"));if(!v)rc=fail("Resolver failed");else if(error&&*error)rc=fail("%s",error);jfree(v);return rc;
+ close(fd);int status=yt_reap(pid);fprintf(stderr,"YouTube resolver exit=%d signal=%d bytes=%zu\n",status>=0&&WIFEXITED(status)?WEXITSTATUS(status):-1,status>=0&&WIFSIGNALED(status)?WTERMSIG(status):0,out->len);if(rc)return rc;struct jval *v=json_parse(out->p,out->len);const char *error=jstr(jget(v,"error"));if(!v)rc=fail("Resolver failed");else if(error&&*error)rc=fail("%s",error);jfree(v);return rc;
 }
 #ifndef REBOX_YOUTUBE_MODULE
 static int yt_claim(char token[33]){if(random_hex(token,32))return -1;state_lock();if(S->playing||S->iptv_active||S->yt_active){state_unlock();return fail("Stop current playback before using YouTube");}S->yt_active=1;S->yt_claimed=0;S->yt_claim_at=0;S->yt_error[0]=0;snprintf(S->yt_token,sizeof S->yt_token,"%s",token);state_unlock();return 0;}
@@ -41,7 +46,7 @@ static void yt_stream(int fd,const char *path,const char *method){if(strcmp(meth
  int in=-1;pid_t pid=yt_spawn(&in,"",video,audio,1);int rc=pid<0,started=0;double until=mono_now()+25;char buf[32768];struct timeval timeout={3,0};setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof timeout);
  for(int attempt=0;attempt<2;attempt++){
  while(!rc&&yt_active(token)){if(mono_now()>until){rc=1;break;}struct pollfd p={in,POLLIN,0};int r=poll(&p,1,100);if(r<0&&errno==EINTR)continue;if(r<0){rc=1;break;}if(!r)continue;ssize_t n=read(in,buf,sizeof buf);if(n<=0){rc=n<0;break;}if(!started){const char *h="HTTP/1.1 200 OK\r\nContent-Type: video/mp2t\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";rc=write_all_fd(fd,h,strlen(h));started=1;}if(!rc)rc=write_all_fd(fd,buf,n);until=mono_now()+25;}
- if(in>=0)close(in);yt_reap(pid);
+ if(in>=0)close(in);int status=yt_reap(pid);fprintf(stderr,"YouTube packet-copy exit=%d signal=%d started=%d\n",status>=0&&WIFEXITED(status)?WEXITSTATUS(status):-1,status>=0&&WIFSIGNALED(status)?WTERMSIG(status):0,started);if(status<0||!WIFEXITED(status)||WEXITSTATUS(status))rc=1;
  if(started||attempt||!yt_active(token))break;
  /* Signed CDN URLs are ephemeral: one fresh resolution before any TS bytes. */
  char id[JF_ID_MAX];state_lock();snprintf(id,sizeof id,"%s",S->play_item);state_unlock();

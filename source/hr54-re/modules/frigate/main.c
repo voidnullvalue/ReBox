@@ -3,9 +3,11 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/time.h>
+#include <sys/prctl.h>
+#include <sys/wait.h>
 #define REBOX_FRIGATE_MODULE 1
 static const char *data_root;
-static char host[64]="192.168.88.39",session[33];static int port=5000,playing;
+static char host[64]="192.168.88.39",session[33],selected_stream[256],stream_host[64],last_error[256];static int port=5000,stream_port,playing,claimed;
 static pthread_mutex_t operation_mutex=PTHREAD_MUTEX_INITIALIZER,state_mutex=PTHREAD_MUTEX_INITIALIZER;
 /* JSON is bounded and contains private camera URLs. Only normalized names and
  * codec decisions may leave this process. */
@@ -15,9 +17,10 @@ static struct jval *frigate_get(const char *path){
     if(inet_pton(AF_INET,host,&address.sin_addr)!=1||connect(fd,(void *)&address,sizeof address)){close(fd);fail("Frigate connection failed");return NULL;}
     struct sb request={0},response={0};sb_fmt(&request,"GET %s HTTP/1.0\r\nHost: %s:%d\r\nConnection: close\r\n\r\n",path,host,port);
     int rc=write_all_fd(fd,request.p,request.len);free(request.p);while(!rc){char b[16384];ssize_t n=read(fd,b,sizeof b);if(n<0&&errno==EINTR)continue;if(n<0){rc=-1;break;}if(!n)break;if(response.len+(size_t)n>2*1024*1024||sb_putn(&response,b,n)){rc=-1;break;}}close(fd);
-    struct jval *v=NULL;int code=0;char *body=response.p?strstr(response.p,"\r\n\r\n"):NULL;if(!rc&&body&&sscanf(response.p,"HTTP/%*s %d",&code)==1&&code==200)v=json_parse(body+4,response.len-(size_t)(body+4-response.p));free(response.p);if(!v)fail("Frigate API unavailable");return v;
+    struct jval *v=NULL;int code=0;char *body=response.p?strstr(response.p,"\r\n\r\n"):NULL;if(!rc&&body&&sscanf(response.p,"HTTP/%*s %d",&code)==1&&code==200)v=json_parse(body+4,response.len-(size_t)(body+4-response.p));free(response.p);if(!v){fprintf(stderr,"Frigate API request failed HTTP=%d io=%d\n",code,rc);fail("Frigate API unavailable (HTTP %d)",code);}return v;
 }
 #include "library.inc"
+#include "relay.inc"
 static int configuration(struct jval *v){
     const char *value=jstr(jget(v,"host"));double number=jnum(jget(v,"port"),0);struct in_addr ipv4;
     if(!value||strlen(value)>=sizeof host||inet_pton(AF_INET,value,&ipv4)!=1||number<1||number>65535||number!=(int)number)return fail("An IPv4 host and valid port are required");
@@ -33,14 +36,17 @@ static int browse(const char *query,int search,struct sb *out){
 }
 static int prepare(struct jval *body,struct sb *out){
     const char *id=jstr(jget(body,"itemId"));if(!id||!*id||strlen(id)>255)return fail("camera ID required");struct jval *v=frigate_get("/api/config");if(!v)return -1;char stream[256];int rc=frigate_camera(v,id,stream,sizeof stream);jfree(v);if(rc)return -1;
-    struct sb url={0};sb_fmt(&url,"http://%s:%d/stream.ts?src=",host,port);url_encode(&url,stream);char token[33];if(rb_random(token,32)){free(url.p);return -1;}
-    pthread_mutex_lock(&state_mutex);strcpy(session,token);playing=1;pthread_mutex_unlock(&state_mutex);
-    sb_puts(out,"{\"ok\":true,\"type\":\"stream\",\"title\":");sb_json_str(out,id);sb_puts(out,",\"live\":true,\"duration\":0,\"stream\":{\"kind\":\"http\",\"url\":");sb_json_str(out,url.p);sb_fmt(out,"},\"session\":\"%s\",\"transport\":{\"stop\":true,\"pause\":false,\"resume\":false,\"seek\":false}}",token);free(url.p);return 0;
+    char helper[1024];if(relay_path(helper,sizeof helper)||access(helper,X_OK))return fail("Frigate packet-copy helper unavailable");
+    char token[33];if(rb_random(token,32))return -1;
+    pthread_mutex_lock(&state_mutex);strcpy(session,token);strcpy(selected_stream,stream);strcpy(stream_host,host);stream_port=port;playing=1;claimed=0;last_error[0]=0;pthread_mutex_unlock(&state_mutex);
+    fprintf(stderr,"Frigate playback prepared endpoint=http://%s:%d/live/mse/api/ws?src=[camera] format=H.264/AAC fMP4 -> MPEG-TS\n",host,port);
+    sb_puts(out,"{\"ok\":true,\"type\":\"stream\",\"title\":");sb_json_str(out,id);sb_fmt(out,",\"live\":true,\"duration\":0,\"stream\":{\"kind\":\"moduleProxy\",\"token\":\"%s.ts\"},\"session\":\"%s\",\"transport\":{\"stop\":true,\"pause\":false,\"resume\":false,\"seek\":false}}",token,token);return 0;
 }
 static void settings(struct sb *out){sb_puts(out,"{\"ok\":true,\"fields\":[{\"key\":\"host\",\"label\":\"Frigate IPv4 host\",\"type\":\"string\",\"value\":");sb_json_str(out,host);sb_fmt(out,"},{\"key\":\"port\",\"label\":\"HTTP port\",\"type\":\"integer\",\"value\":%d}],\"actions\":[]}",port);}
 static void handle(int fd,const RbRequest *request){
     char path[2048];strcpy(path,request->path);char *query=strchr(path,'?');if(query)*query++=0;
-    if(!strcmp(path,"/status")){pthread_mutex_lock(&state_mutex);struct sb out={0};sb_fmt(&out,"{\"ok\":true,\"moduleApi\":1,\"playback\":{\"session\":\"%s\",\"playing\":%s}}",session,playing?"true":"false");pthread_mutex_unlock(&state_mutex);rb_http_json(fd,200,out.p);free(out.p);return;}
+    if(!strcmp(path,"/status")){pthread_mutex_lock(&state_mutex);struct sb out={0};sb_fmt(&out,"{\"ok\":true,\"moduleApi\":1,\"playback\":{\"session\":\"%s\",\"playing\":%s},\"error\":",session,playing?"true":"false");sb_json_str(&out,last_error);sb_puts(&out,"}");pthread_mutex_unlock(&state_mutex);rb_http_json(fd,200,out.p);free(out.p);return;}
+    if(!strncmp(path,"/stream/",8)){serve_stream(fd,path+8,request->method);return;}
     if(!strcmp(path,"/playback/stop")){struct jval *v=json_parse(request->body,request->length);const char *token=jstr(jget(v,"session"));pthread_mutex_lock(&state_mutex);if(!token||!strcmp(token,session))playing=0;pthread_mutex_unlock(&state_mutex);jfree(v);rb_http_json(fd,200,"{\"ok\":true}");return;}
     pthread_mutex_lock(&operation_mutex);struct sb out={0};struct jval *body=json_parse(*request->body?request->body:"{}",*request->body?request->length:2);int rc=0,code=200;
     if(!body||body->t!=J_OBJ)code=400;

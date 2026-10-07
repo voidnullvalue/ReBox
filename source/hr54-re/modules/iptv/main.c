@@ -47,8 +47,10 @@ static int browse(const char *query,int search,struct sb *out){
 static int prepare(struct jval *body,struct sb *out){
     const char *id=jstr(jget(body,"itemId"));if(!id)id=jstr(jget(body,"channelId"));struct iptv_channel *c=iptv_find(id);if(!c)return fail("Unknown IPTV channel ID");
     char token[33],selected[IPTV_URL_CAP+1];if(rb_random(token,32))return -1;
+    rb_media_origin("IPTV playlist entry",c->url);
     state_lock();playback_end_locked();strcpy(S->iptv_token,token);S->iptv_active=1;S->iptv_error[0]=0;state_unlock();
     if(iptv_probe(c,selected,token)){state_lock();if(!strcmp(S->iptv_token,token))playback_end_locked();state_unlock();return -1;}
+    rb_media_origin("IPTV selected stream",selected);
     state_lock();if(!S->iptv_active||strcmp(S->iptv_token,token)){state_unlock();return fail("IPTV preparation cancelled");}
     snprintf(S->iptv_url,sizeof S->iptv_url,"%s",selected);snprintf(S->iptv_ua,sizeof S->iptv_ua,"%s",c->ua);snprintf(S->iptv_ref,sizeof S->iptv_ref,"%s",c->ref);state_unlock();
     sb_puts(out,"{\"ok\":true,\"type\":\"stream\",\"title\":");sb_json_str(out,c->name);sb_fmt(out,",\"live\":true,\"duration\":0,\"stream\":{\"kind\":\"moduleProxy\",\"token\":\"%s.ts\"},\"session\":\"%s\",\"transport\":{\"stop\":true,\"pause\":false,\"resume\":false,\"seek\":false}}",token,token);return 0;

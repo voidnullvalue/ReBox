@@ -2,7 +2,7 @@
  * no video is written to disk and no codec processing/transcoding occurs. */
 struct iptv_fetch {int fd;pid_t pid;char url[IPTV_URL_CAP+1],ct[257];};
 static int iptv_active(const char *token){int ok;state_lock();ok=S->iptv_active&&!strcmp(S->iptv_token,token);state_unlock();return ok;}
-static void iptv_fetch_close(struct iptv_fetch *f){if(f->fd>=0)close(f->fd);if(f->pid>0){kill(f->pid,SIGKILL);while(waitpid(f->pid,NULL,0)<0&&errno==EINTR){}}f->fd=-1;f->pid=0;}
+static void iptv_fetch_close(struct iptv_fetch *f){if(f->fd>=0)close(f->fd);if(f->pid>0){int status=0;pid_t got;do{got=waitpid(f->pid,&status,WNOHANG);}while(got<0&&errno==EINTR);if(!got){kill(f->pid,SIGKILL);while(waitpid(f->pid,&status,0)<0&&errno==EINTR){}}jf_log("IPTV fetch exit=%d signal=%d",got>=0&&WIFEXITED(status)?WEXITSTATUS(status):-1,got>=0&&WIFSIGNALED(status)?WTERMSIG(status):0);}f->fd=-1;f->pid=0;}
 static ssize_t iptv_read(struct iptv_fetch *f,void *buf,size_t cap,const char *token){
  double until=mono_now()+20;for(;;){if(token&&!iptv_active(token))return fail("IPTV stopped");struct pollfd p={f->fd,POLLIN,0};int r=poll(&p,1,100);if(r<0&&errno==EINTR)continue;if(r<0)return -1;if(r){ssize_t n=read(f->fd,buf,cap);if(n<0&&errno==EINTR)continue;return n;}if(mono_now()>until)return fail("Channel unreachable or TLS connection failed");}}
 static int iptv_open(struct iptv_fetch *f,const char *url,const char *ua,const char *ref,int timeout,const char *token){
@@ -12,6 +12,7 @@ static int iptv_open(struct iptv_fetch *f,const char *url,const char *ua,const c
  snprintf(helper,sizeof helper,"%s/bin/fetch",package_root);
 #endif
  const char *env=getenv("IPTV_FETCH_CMD");if(env&&*env)snprintf(helper,sizeof helper,"%s",env);snprintf(ca,sizeof ca,"%s/iptv/ca-certificates.crt",persist_root);snprintf(seconds,sizeof seconds,"%d",timeout);
+ jf_log("IPTV fetch path=%s timeout=%d userAgent=%s referer=%s",helper,timeout,*ua?"provided":"default",*ref?"provided":"absent");
  pid_t owner=getpid();int p[2];if(pipe(p))return fail("Unable to start TLS helper");f->pid=fork();if(f->pid<0){close(p[0]);close(p[1]);return fail("Unable to start TLS helper");}
  if(!f->pid){prctl(PR_SET_PDEATHSIG,SIGKILL);if(getppid()!=owner)_exit(127);alarm(0);dup2(p[1],1);close(p[0]);close(p[1]);for(int inherited=3;inherited<1024;inherited++)close(inherited);execl(helper,helper,url,ca,ua,ref,seconds,(char *)NULL);_exit(127);}close(p[1]);f->fd=p[0];
  char header[IPTV_URL_CAP+260];size_t n=0;int newlines=0;while(n<sizeof header-1){char c;ssize_t r=iptv_read(f,&c,1,token);if(r<=0){iptv_fetch_close(f);return fail("Channel unavailable or TLS connection failed (see fetch log)");}header[n++]=c;if(c=='\n'&&++newlines==3)break;}header[n]=0;

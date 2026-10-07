@@ -31,6 +31,11 @@ static int prepare(struct jval *body,struct sb *out){
     struct sb result={0};int rc=yt_resolve("play",id,"0",token,&result);struct jval *v=rc?NULL:json_parse(result.p,result.len);
     const char *video=jstr(jget(v,"videoUrl")),*audio=jstr(jget(v,"audioUrl")),*title=jstr(jget(v,"title"));double duration=jnum(jget(v,"duration"),0);
     if(!rc&&(!video||!audio||strlen(video)>8192||strlen(audio)>8192||strncmp(video,"https://",8)||strncmp(audio,"https://",8)||strpbrk(video,"\r\n")||strpbrk(audio,"\r\n")||duration<0||duration>604800))rc=fail("Resolver returned invalid media URLs or duration");
+    if(!rc){
+        rb_media_origin("YouTube selected video",video);rb_media_origin("YouTube selected audio",audio);
+        const char *keys[]={"videoFormat","audioFormat"};
+        for(size_t i=0;i<2;i++){const char *format=jstr(jget(v,keys[i]));if(format&&strlen(format)<32&&strspn(format,"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")==strlen(format))fprintf(stderr,"YouTube %s=%s\n",keys[i],format);}
+    }
     if(!rc){state_lock();if(!S->yt_active||strcmp(S->yt_token,token))rc=fail("YouTube cancelled");else{strcpy(S->yt_video,video);strcpy(S->yt_audio,audio);strcpy(S->play_item,id);S->yt_duration=duration;}state_unlock();}
     if(!rc){sb_puts(out,"{\"ok\":true,\"type\":\"stream\",\"title\":");char bounded[256];snprintf(bounded,sizeof bounded,"%s",title?title:id);sb_json_str(out,bounded);sb_fmt(out,",\"live\":false,\"duration\":%.0f,\"stream\":{\"kind\":\"moduleProxy\",\"token\":\"%s.ts\"},\"session\":\"%s\",\"transport\":{\"stop\":true,\"pause\":false,\"resume\":false,\"seek\":false}}",duration,token,token);}
     else{state_lock();if(!strcmp(S->yt_token,token)){snprintf(S->yt_error,sizeof S->yt_error,"%s",g_err);playback_end_locked();}state_unlock();}

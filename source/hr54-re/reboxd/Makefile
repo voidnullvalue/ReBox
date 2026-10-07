@@ -11,7 +11,7 @@ build/registry: tests/registry.c $(LIB) $(wildcard *.h)
 build/reboxd: main.c http.c $(RUNTIME) $(LIB) $(wildcard *.h)
 	mkdir -p build
 	$(CC) $(CFLAGS) -I. -o $@ main.c http.c $(RUNTIME) $(LIB) -lm -pthread
-test: all build/test-seed build/jellyfin-module build/iptv-module build/iptv-fetch build/youtube-module build/frigate-module build/doom-module
+test: all build/test-seed build/jellyfin-module build/iptv-module build/iptv-fetch build/youtube-module build/frigate-module build/frigate-relay build/doom-module
 	python3 tests/foundation.py
 	python3 tests/seed.py
 	python3 tests/runtime.py
@@ -56,9 +56,13 @@ build/youtube-module: ../modules/youtube/main.c ../modules/youtube/runtime.inc .
 	mkdir -p build
 	$(CC) $(CFLAGS) -DREBOX_HOST_TEST -Wno-unused-function -I. -o $@ ../modules/youtube/main.c ../modules/shared/sdk.c http.c json.c files.c module_auth.c -lm -pthread
 
-build/frigate-module: ../modules/frigate/main.c ../modules/frigate/library.inc ../modules/shared/sdk.c http.c json.c files.c module_auth.c
+build/frigate-module: ../modules/frigate/main.c ../modules/frigate/library.inc ../modules/frigate/relay.inc ../modules/shared/sdk.c http.c json.c files.c module_auth.c
 	mkdir -p build
 	$(CC) $(CFLAGS) -DREBOX_HOST_TEST -Wno-unused-function -I. -o $@ ../modules/frigate/main.c ../modules/shared/sdk.c http.c json.c files.c module_auth.c -lm -pthread
+
+build/frigate-relay: ../modules/frigate/relay.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $< $$(pkg-config --cflags --libs libavformat libavcodec libavutil)
 
 build/doom-module: ../modules/doom/main.c ../modules/doom/lifecycle.inc ../modules/doom/input.inc ../tools/native-ui/presentation_policy.h ../modules/shared/sdk.c http.c json.c files.c
 	mkdir -p build

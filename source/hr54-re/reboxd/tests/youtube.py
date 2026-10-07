@@ -24,7 +24,7 @@ class Youtube(unittest.TestCase):
 mode,arg,page=sys.argv[1:]
 if arg in ('slow','slow0000000'):time.sleep(30)
 if mode=='search':print(json.dumps({'page':int(page),'hasMore':int(page)<2,'results':[{'id':'jNQXAC9IVRw','title':'Example video','channel':'A channel','duration':2}]}))
-else:print(json.dumps({'videoUrl':'https://cdn.example/video','audioUrl':'https://cdn.example/audio','title':'Example video','duration':2}))
+else:print(json.dumps({'videoUrl':'https://cdn.example/video?signature=private-test-secret','audioUrl':'https://cdn.example/audio?signature=private-test-secret','title':'Example video','duration':2}))
 ''');py_compile.compile(str(src),cfile=str(y/'resolver.pyc'))
         # Relay fixture emits TS then stays alive to exercise concurrent Stop.
         relay=y/'bin/relay'
@@ -47,6 +47,7 @@ else:print(json.dumps({'videoUrl':'https://cdn.example/video','audioUrl':'https:
         token=self.get(self.prefix+'/status')['playback']['session']
         stream=urllib.request.urlopen(self.url+'/module-stream/youtube/'+token+'.ts',timeout=5);self.addCleanup(stream.close);self.assertEqual(stream.read(188)[0],0x47)
         self.assertTrue(self.get('/api/system/status')['ready']);self.get('/api/youtube/stop',{});self.assertFalse(self.get('/api/state')['playing'])
+        log=(self.root/'log/youtube.log').read_text();self.assertIn('YouTube selected video URL=https://cdn.example/[redacted]',log);self.assertNotIn('private-test-secret',log);self.assertIn('resolver exit=0',log)
     def test_cancel_search_and_play_preparation(self):
         for path,body in [('/api/youtube/search?q=slow',None),(self.prefix+'/play',{'itemId':'slow0000000'})]:
             result=[]
