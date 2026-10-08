@@ -12,10 +12,11 @@ typedef struct {char parent[256],title[256],query[65];int offset,selection;} Bro
 typedef struct {
     Screen screen,previous,return_screen,error_return,keyboard_return;
     ModuleList modules;int home_modules[REBOX_MAX_MODULES],home_count,modules_loaded;
-    char active_module[64],operation_module[64],return_module[64],managed_module[64],active_native_module[64];
+    char active_module[64],operation_module[64],return_module[64],managed_module[64],active_native_module[64],opening_module[64];
     BrowseNode navigation[NAV_DEPTH];int depth;MediaList media;ModuleSettings module_settings;
     int home,settings_focus,module_focus,keyboard_focus,keyboard_upper,ready,frontend_prepared,still,start_hidden;
     int loading,dirty,visible,native_app_running,native_app_starting,native_app_returning,native_release_surface,native_release_input,input_active,surface_open,status_failures;
+    int module_open_stops;
     int awaiting,player_focus,cancel_play,stop_after_play,edit_field,management_pair,refresh_modules;
     KeyboardMode keyboard_mode;char query[65],entry[1025],pair_code[40],poll_action[64],message[256],notice[160];
     uint64_t next_status,next_modules,next_action,prepare_due,animate_start,last_key,notice_until,art_due,player_until;

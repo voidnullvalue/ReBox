@@ -27,6 +27,7 @@ int api_parse_playback(const ApiResponse *,PlaybackState *);
 int api_parse_settings(const ApiResponse *,ModuleSettings *);
 int api_parse_operation(const ApiResponse *,OperationResult *);
 int api_modules(ApiClient *);
+int api_module_open(ApiClient *);
 int api_module_browse(ApiClient *,const char *,const char *,const char *,int);
 int api_module_play(ApiClient *,const char *,const MediaItem *);
 int api_module_settings(ApiClient *,const char *);

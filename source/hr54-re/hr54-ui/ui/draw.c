@@ -25,9 +25,9 @@ void draw_background(UiFramebuffer *f,uint64_t now){
                   plasma_sine[(wy*3-phase/2)&1023]/6+
                   plasma_sine[(wx+wy+phase)&1023]/10;
         int dx=px-UI_WIDTH/2,dy=py-UI_HEIGHT/2;
-        int vignette=(dx*dx/90000+dy*dy/65000)*256;
-        int value=7*256+smoke-vignette;
-        if(value<2*256)value=2*256;if(value>15*256)value=15*256;grid[y][x]=value;
+        int vignette=dx*dx*256/90000+dy*dy*256/65000;
+        int value=5*256+4*(smoke-vignette);
+        if(value<0)value=0;if(value>18*256)value=18*256;grid[y][x]=value;
     }
     for(int y=0;y<UI_HEIGHT;y++)for(int x=0;x<UI_WIDTH;x++){
         int gy=y/STEP,gx=x/STEP,fy=y%STEP,fx=x%STEP;

@@ -1,0 +1,110 @@
+#!/bin/sh
+# Self-healing check for the asset-7 and asset-23 plugin replacements.
+#
+# Why this exists.  Plugin 23's signature anchors on plugin 7's genuine image
+# (7_6932_6932.squashfs) rather than on a plugin-23 image.  Anchoring on a
+# plugin-23 image is what failed first: the root installer prunes an asset image
+# once a newer version of the same asset is mounted, so the signature's anchor
+# vanished on the following boot and the installer deleted both files.  The
+# plugin-7 anchor survives for the same reason plugin 7 does.
+#
+# That makes the two replacements coupled, and the only realistic way plugin 23
+# disappears is something pruning /var/network/plugins.  This restores the pair
+# from /var/hr54-persist/backup when that happens, so the next boot selects it
+# again.  It is a repair step, not an update blocker: no network is touched and
+# nothing legitimate is disabled.
+#
+# Exit status: 0 healthy or repaired, 1 a problem remains.
+
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/opt/sig/bin
+export PATH
+
+PD=/var/network/plugins
+BK=/var/hr54-persist/backup
+LOG=/var/hr54-beachhead/verify-assets.log
+SIGTST=/opt/sig/bin/sigtst
+
+mkdir -p /var/hr54-beachhead
+: > "$LOG"
+
+say() { echo "$*" >> "$LOG"; }
+
+PLUGIN=23_6933_6840
+ANCHOR=7_6932_6932.squashfs
+
+# The ReBox-branded plugin backup is separate from the preserved old artwork.
+# Map the selectable live name onto the current branded recovery copy.
+BACKUP="$BK/$PLUGIN-rebox"
+rc=0
+
+# 1. The anchor plugin 23's signature depends on must exist.
+if [ ! -f "$PD/$ANCHOR" ]; then
+    say "ANCHOR MISSING: $PD/$ANCHOR"
+    if [ -f "$BK/7_6932_6932.anchor.squashfs" ]; then
+        cp "$BK/7_6932_6932.anchor.squashfs" "$PD/$ANCHOR" &&
+            say "  restored anchor from backup"
+    else
+        say "  no anchor backup available - cannot safely re-sign"
+        rc=1
+    fi
+fi
+
+# 2. The plugin-23 replacement and its signature must both be present.
+for ext in squashfs sig; do
+    dest="$PD/$PLUGIN.$ext"
+    src="$BACKUP.$ext"
+    if [ ! -f "$dest" ] && [ -f "$src" ]; then
+        cp "$src" "$dest" && say "RESTORED $PLUGIN.$ext from backup"
+    fi
+done
+
+# 3. The signature must verify against the image actually on disk.
+if [ -f "$PD/$PLUGIN.squashfs" ] && [ -f "$PD/$PLUGIN.sig" ]; then
+    if [ -x "$SIGTST" ]; then
+        if "$SIGTST" "$PD/$PLUGIN.sig" >> "$LOG" 2>&1; then
+            say "OK signature verifies: $PLUGIN"
+        else
+            say "BAD signature does not verify: $PLUGIN"
+            rc=1
+        fi
+    fi
+else
+    say "MISSING $PLUGIN.squashfs or $PLUGIN.sig"
+    rc=1
+fi
+
+# 4. Report which plugin-23 image the loop devices actually selected.  This runs
+#    after plugin mounting, so it can detect a fallback but cannot undo one; a
+#    restore in step 2 takes effect on the next boot.
+selected=
+for d in /sys/block/loop*; do
+    b=$(cat "$d/loop/backing_file" 2>/dev/null)
+    case "$b" in
+        */23_*) selected=$b ;;
+    esac
+done
+if [ -n "$selected" ]; then
+    say "SELECTED $selected"
+    case "$selected" in
+        */"$PLUGIN.squashfs") ;;
+        *) say "  WARNING: expected $PLUGIN.squashfs" ;;
+    esac
+else
+    say "no plugin-23 image selected"
+fi
+
+# 5. Confirm the replacement logos are actually the ones being served.
+missing=
+for f in backgrounds/logo_logoscreen.png backgrounds/pig.png screensaver.png \
+         DTV_Logo.png directv_large.png backgrounds/logo_dtv.png \
+         ipor_dtv_logo.png splash_dtv_logo.png DIRECTV_Signal_Saver.png \
+         menu/img_showroom.png menu/poster_ondemand.png; do
+    [ -f "/opt/ui_assets/assetspack/images/$f" ] || missing="$missing $f"
+done
+if [ -n "$missing" ]; then
+    say "MISSING IMAGES:$missing"
+else
+    say "OK all 11 replacement images present"
+fi
+
+exit $rc

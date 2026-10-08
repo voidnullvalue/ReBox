@@ -9,7 +9,7 @@ import zipfile
 root = Path(__file__).resolve().parents[1]
 payload = root / 'receiver/payload/hr54-persist'
 expected = {
-    'native-menu/hr54-ui': 'e014f494fa7a056666f4709c09632419',
+    'native-menu/hr54-ui': '5fb4558369a0055f41e05ed90b67e302',
     'native-menu/hr54-input-broker': '5524b8e01569cf8e66b7586a03874eba',
     'jellyfin/bin/hr54-jf': '406e984b2c26e0ae1832b6d122238da3',
     'bin/hr54-play-url': '853fe5b3c7c6e0a61160af438b6cece0',
@@ -25,7 +25,8 @@ with zipfile.ZipFile(apk) as package:
 assert (payload/'jellyfin/iptv/eng.m3u').read_text().startswith('#EXTM3U')
 assert '--cookies' not in (payload/'jellyfin/youtube/yt-dlp.conf').read_text()
 for directory in ['jellyfin/config', 'jellyfin/state', 'jellyfin/cache']:
-    assert not list((payload/directory).iterdir()), directory
+    location = payload/directory
+    assert not location.exists() or not list(location.iterdir()), directory
 for flag in ['ENABLED','ACTIVATED','BROKER_BYPASSED','loaded-boot']:
     assert not (payload/'native-menu'/flag).exists(), flag
 for file in root.rglob('*'):

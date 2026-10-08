@@ -2,6 +2,7 @@
 #include "internal.h"
 int api_module_id(const char *id){size_t n=id?strlen(id):0;if(!n||n>=64||!strchr("abcdefghijklmnopqrstuvwxyz0123456789",id[0]))return 0;for(size_t i=1;i<n;i++)if(!strchr("abcdefghijklmnopqrstuvwxyz0123456789._-",id[i]))return 0;return 1;}
 static int route(char *path,size_t size,const char *id,const char *operation){if(!api_module_id(id))return -1;int n=snprintf(path,size,"/api/modules/%s/%s",id,operation);return n<0||(size_t)n>=size?-1:0;}
+int api_module_open(ApiClient *a){return get(a,API_OPERATION,API_MODULE_OPEN,"/api/system/status",6000);}
 int api_modules(ApiClient *a){return get(a,API_BROWSE,API_MODULES,"/api/modules",6000);}
 int api_module_browse(ApiClient *a,const char *id,const char *parent,const char *query,int offset){
     char p[800],q[800],path[1800],base[128];if(offset<0||api_encode(p,sizeof p,parent)||api_encode(q,sizeof q,query)||route(base,sizeof base,id,*query?"search":"browse"))return -1;

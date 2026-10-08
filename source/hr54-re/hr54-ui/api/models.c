@@ -65,7 +65,7 @@ int api_parse_operation(const ApiResponse *r,OperationResult *out){
     out->ready=boolean(&j,0,"ready");out->prepared=boolean(&j,0,"prepared");out->busy=field(&j,0,"mediaBusy")<0||boolean(&j,0,"mediaBusy");out->running=boolean(&j,0,"running");out->authenticated=boolean(&j,0,"authenticated");out->pending=boolean(&j,0,"pending");
     if(field(&j,0,"code")>=0&&j.t[field(&j,0,"code")].type!='n')rc=string(&j,0,"code",out->code,sizeof out->code,0);
     if(string(&j,0,"message",out->message,sizeof out->message,0)||string(&j,0,"pollAction",out->poll_action,sizeof out->poll_action,0)||string(&j,0,"nativeModule",out->native_module,sizeof out->native_module,0))rc=-1;
-    if(r->kind==API_READY){char frontend[16];if(string(&j,0,"frontend",frontend,sizeof frontend,1)||strcmp(frontend,"native")||!out->ready||field(&j,0,"nativeModule")<0)rc=-1;}
+    if(r->kind==API_READY||r->kind==API_MODULE_OPEN){char frontend[16];if(string(&j,0,"frontend",frontend,sizeof frontend,1)||strcmp(frontend,"native")||!out->ready||field(&j,0,"nativeModule")<0)rc=-1;}
     if(r->kind==API_PREPARE&&!out->prepared)rc=-1;
     json_close(&j);return rc;
 }

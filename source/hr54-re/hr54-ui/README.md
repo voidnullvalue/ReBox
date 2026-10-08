@@ -45,7 +45,7 @@ backend until the remaining receiver acceptance checks are complete.
 
 The current design is minimalist and XMB-inspired: official Jellyfin SVG,
 Overpass typography, antialiased icon/artwork filtering, neutral flat surfaces,
-and subtle home-only grayscale plasma (5 Hz, 180-second loop). Font/art licenses
+and subtle home-only grayscale plasma (5 Hz, 120-second loop). Font/art licenses
 and reproduction instructions are in [assets/SOURCES.md](assets/SOURCES.md).
 The production-renderer motion preview is `previews/plasma-home.gif`.
 
