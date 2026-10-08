@@ -1,0 +1,71 @@
+{
+  "repository": "https://api.github.com/repos/deroverda/recommended-radio-streams",
+  "commit": "8f07b17a8de3acd3c95c9dd6bc192b551634804c",
+  "files": [
+    {
+      "name": "ambient-lo-fi-chill.m3u",
+      "sha256": "2e9f943ab1c8cf0cfa63c3927650606fbaf967650d113bf7f82adef26dbaf8a2"
+    },
+    {
+      "name": "campus-public-radio.m3u",
+      "sha256": "feb28cffbbff35870290a56c824a402b86c03348ae94d4ad29bd1eca5c284087"
+    },
+    {
+      "name": "christmas-holiday.m3u",
+      "sha256": "9d17d2d532e0322aee9a93b6c866b266989ec867b554d0b80988dc6af3a1f236"
+    },
+    {
+      "name": "classical-opera.m3u",
+      "sha256": "7eb16f9984f4654ea9c5b57e1c9853dc600727279ee867b291925d07b7203bb0"
+    },
+    {
+      "name": "decades-oldies-nostalgia.m3u",
+      "sha256": "e325ccda71104c889ea6c9251c138cad008a960e3250706b8a19720f937254a6"
+    },
+    {
+      "name": "electronic.m3u",
+      "sha256": "3c65955750a799b3915aac825706ccc0174712d07c3ae31539a14fab2668cd89"
+    },
+    {
+      "name": "experimental-nerdy-scanners.m3u",
+      "sha256": "da8cd4681c4598d8140a751498797bff6a87015236551c8c960048e6a08878a5"
+    },
+    {
+      "name": "funk-soul-hip-hop-disco.m3u",
+      "sha256": "315d72669a9d64dfe4f95fa93a534881e09500e6da5317244a40cff71e543f48"
+    },
+    {
+      "name": "global-independent-online-communities.m3u",
+      "sha256": "9b5bfedb5ef51a5dcb2b6ff5309cbe4d895ad88d9468fdca177c99fb1d48091a"
+    },
+    {
+      "name": "jazz-blues.m3u",
+      "sha256": "e831b91ef42e16a3ba2aa1041befda520de46ff7f1b0e512e20f47c34e462720"
+    },
+    {
+      "name": "metal-heavy.m3u",
+      "sha256": "e805807ad7f1df86607c19c4f2e22a50ec4e8703d7fce4bfd5dd64e9296d399b"
+    },
+    {
+      "name": "news-spoken-word.m3u",
+      "sha256": "d20928ebb7c9a2ac9ba4caa1c09f14f2b221838b4aa6be21d26792814140ebc1"
+    },
+    {
+      "name": "reggae-dub.m3u",
+      "sha256": "27175375e020c3bb677e407ef7e4799e2e21492730829b0d279b3d2db3022270"
+    },
+    {
+      "name": "rock-indie-alternative-country-folk.m3u",
+      "sha256": "ed6762c9075c625a011cef25e9e7cfffb4390cafc7cd8fe35fdd20f0c21136f9"
+    },
+    {
+      "name": "video-game-chiptune-soundtracks.m3u",
+      "sha256": "7128b1c449d8772703a379353eec3f61bb0ff637edab80d31d155dd72c222ebb"
+    },
+    {
+      "name": "world-regional.m3u",
+      "sha256": "4f71e68f20f6d9a42ccc181190b026f1d8d7eed4700856ddb56bedbb47df2af7"
+    }
+  ],
+  "stations": 443
+}

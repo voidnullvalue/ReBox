@@ -451,3 +451,12 @@ Host relay tests need FFmpeg development libraries (`pkg-config libavformat
 libavcodec libavutil`) plus `ffmpeg`/`ffprobe` for a real fMP4 fixture.
 
 See [the playback investigation and receiver evidence](PLAYBACK-20261007.md).
+
+## Live channel transport
+
+Providers can advertise `transport.channelUp` and `channelDown` in a stream
+plan. Core exposes these flags in `/api/state`. The corresponding
+`POST /api/playback/channelUp` and `channelDown` routes call the provider’s
+private `POST /adjacent` RPC with `{itemId,direction}` and expect `{itemId}`.
+Lists, ordering, wraparound and candidate checks belong to the provider; core
+retains decoder/session ownership. See [radio acceptance](RADIO-AND-SURFING.md).

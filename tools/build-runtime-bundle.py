@@ -16,7 +16,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'source/hr54-re'
 PAYLOAD = ROOT / 'receiver/payload/hr54-persist'
-PROVIDERS = ('jellyfin', 'iptv', 'youtube', 'frigate', 'doom')
+PROVIDERS = ('jellyfin', 'iptv', 'youtube', 'frigate', 'radio', 'doom')
 spec = importlib.util.spec_from_file_location('package_builder', ROOT / 'tools/build-module.py')
 builder = importlib.util.module_from_spec(spec); spec.loader.exec_module(builder)
 
@@ -54,10 +54,15 @@ def main():
         package = runtime / 'modules' / identity
         copy(SRC / 'modules' / identity / 'module.json', package / 'module.json')
         copy(SRC / 'modules' / identity / 'build/bin/module', package / 'bin/module', True)
-        copy(SRC / 'hr54-ui/assets/icons' / (identity + '.png'), package / 'icon.png')
+        copy(SRC / 'modules/radio/assets/radio.png' if identity == 'radio' else SRC / 'hr54-ui/assets/icons' / (identity + '.png'), package / 'icon.png')
         manifest = json.loads((package / 'module.json').read_text()); manifest['icon'] = 'icon.png'
         (package / 'module.json').write_text(json.dumps(manifest, separators=(',', ':')) + '\n')
-        if identity == 'iptv':
+        if identity == 'radio':
+            copy(SRC / 'modules/radio/build/bin/audio-remux', package / 'bin/audio-remux', True)
+            copy(SRC / 'modules/radio/worker.py', package / 'bin/worker.py')
+            copy(SRC / 'modules/radio/assets/black.ts', package / 'bin/black.ts')
+            copy(SRC / 'modules/radio/default-data', package / 'default-data')
+        elif identity == 'iptv':
             copy(SRC / 'modules/iptv/build/bin/fetch', package / 'bin/fetch', True)
             copy(PAYLOAD / 'jellyfin/iptv', package / 'default-data/iptv')
         elif identity == 'youtube':

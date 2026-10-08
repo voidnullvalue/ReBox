@@ -15,7 +15,7 @@
 
 ReBox is a replacement userland shell for the DIRECTV HR54-700. It keeps the useful vendor plumbing — Linux, the Broadcom media stack, HDMI, RF remote support and the existing compositor — and replaces the part I actually care about: what the box does after it boots.
 
-Right now that means a custom native UI, a LAN API, a runtime module system, Jellyfin, IPTV, YouTube, a Frigate viewer, native Doom, and an Android controller. The goal is not to turn the HR54 into a generic Linux PC. The vendor media stack already does the hard hardware-specific work.
+Right now that means a custom native UI, a LAN API, a runtime module system, Jellyfin, IPTV, Internet Radio, YouTube, a Frigate viewer, native Doom, and an Android controller. The goal is not to turn the HR54 into a generic Linux PC. The vendor media stack already does the hard hardware-specific work.
 
 > [!WARNING]
 > **ReBox is early alpha software.**
@@ -32,6 +32,8 @@ Right now that means a custom native UI, a LAN API, a runtime module system, Jel
 - module enable/disable, bundled reinstall, uninstall-with-data-preserved and URL installation
 - Jellyfin browsing and playback through the receiver's vendor media path
 - IPTV playback from user-supplied M3U playlists when the stream is compatible with the box
+- Internet Radio: 443 public station entries across 16 genres
+- fullscreen CH+/CH− surfing for IPTV/radio with a Please wait overlay
 - receiver-native YouTube search/extraction/playback using Python, QuickJS, yt-dlp and FFmpeg helpers
 - Frigate camera discovery and live playback through the module relay
 - pause/resume, replacement playback and stop back to ReBox Home
@@ -53,6 +55,7 @@ The current bundled **core modules** are:
 
 - Jellyfin
 - IPTV
+- Internet Radio
 - YouTube
 - Frigate
 - Doom
@@ -150,7 +153,7 @@ Use a trusted or isolated LAN/VLAN. Do not port-forward these services to the In
 | --- | --- |
 | `android/ReBox-controller.apk` | Current Android controller APK |
 | `receiver/payload/hr54-persist/` | Receiver payload, native UI, input broker, API/backend and media runtime assets |
-| `source/hr54-re/modules/` | Jellyfin, IPTV, YouTube, Frigate, Doom, shared module support and test module source |
+| `source/hr54-re/modules/` | Jellyfin, IPTV, Internet Radio, YouTube, Frigate, Doom, shared module support and test module source |
 | `source/hr54-re/reboxd/` | ReBox core daemon, module registry/manager, playback arbitration and management API |
 | `source/hr54-re/hr54-ui/` | Generic receiver-native UI driven by runtime module descriptors |
 | `stock-bootstrap/` | Stock asset-7 boot hook, genuine anchor and big-endian MIPS helper environment |
@@ -186,3 +189,6 @@ That does not mean every path has been re-tested after every change. Cold boot b
 The portable stock packaging and installer have passed offline checks against a cloned stock image. They still need acceptance on another physical stock receiver.
 
 That is why the badge at the top says **EARLY ALPHA**.
+
+The October 8 [radio and channel surfing update](docs/RADIO-AND-SURFING.md)
+records the audio fix, receiver measurements, controls and acceptance.

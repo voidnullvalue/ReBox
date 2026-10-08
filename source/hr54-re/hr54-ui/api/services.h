@@ -7,5 +7,6 @@ int api_playback_stop(ApiClient *);
 int api_playback_pause(ApiClient *,int);
 int api_playback_seek(ApiClient *,int);
 int api_playback_state(ApiClient *);
+int api_channel_step(ApiClient *,int);
 int api_tv_exit(ApiClient *);
 #endif

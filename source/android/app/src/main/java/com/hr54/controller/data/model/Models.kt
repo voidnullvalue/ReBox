@@ -68,7 +68,7 @@ fun moduleAsset(base: String?, id: String, artwork: String? = null): String? = b
         (pollAction.isEmpty() || moduleId(pollAction))) { "Invalid module action result" }; return this }
 }
 @Serializable data class SystemStatus(val ready: Boolean = false, val mediaBusy: Boolean = true, val nativeModule: String = "")
-@Serializable data class Transport(val stop: Boolean = false, val pause: Boolean = false, val resume: Boolean = false, val seek: Boolean = false)
+@Serializable data class Transport(val stop: Boolean = false, val pause: Boolean = false, val resume: Boolean = false, val seek: Boolean = false, val channelUp: Boolean = false, val channelDown: Boolean = false)
 @Serializable data class Playback(val playing: Boolean = false, val source: String? = null, val name: String = "", val title: String = "",
     val itemId: String? = null, val paused: Boolean = false, val live: Boolean = false, val elapsed: Double = 0.0,
     val duration: Double? = null, val transport: Transport = Transport(), val instance: String = "", val generation: Long = 0)

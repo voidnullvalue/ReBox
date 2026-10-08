@@ -77,3 +77,7 @@ Tracing is initially enabled. After acceptance it may be disabled by moving
 `native-menu/INPUT_TRACE` into a backup and restarting the relevant OWNED
 supervisors intentionally. Do not assume a UI kill always restarts it; confirm
 new PIDs. Keep rollback snapshots and exact evidence of remaining limitations.
+
+For the October 8 radio/remote update, see [Radio and channel surfing](RADIO-AND-SURFING.md).
+The user confirmed audible radio without stuttering after the measured source-rate
+fix, and requested ending the longer test. Decoder logs alone are not that confirmation.

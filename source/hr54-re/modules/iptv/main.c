@@ -9,6 +9,7 @@
 #define REBOX_IPTV_MODULE 1
 static const char *persist_root;
 static char package_root[1024];
+static char surf_anchor[32],surf_cursor[32];
 static struct {
     int iptv_active,iptv_claimed,return_to_tv;
     pid_t iptv_worker;
@@ -46,6 +47,7 @@ static int browse(const char *query,int search,struct sb *out){
 }
 static int prepare(struct jval *body,struct sb *out){
     const char *id=jstr(jget(body,"itemId"));if(!id)id=jstr(jget(body,"channelId"));struct iptv_channel *c=iptv_find(id);if(!c)return fail("Unknown IPTV channel ID");
+    surf_anchor[0]=surf_cursor[0]=0;
     char token[33],selected[IPTV_URL_CAP+1];if(rb_random(token,32))return -1;
     rb_media_origin("IPTV playlist entry",c->url);
     state_lock();playback_end_locked();strcpy(S->iptv_token,token);S->iptv_active=1;S->iptv_error[0]=0;state_unlock();
@@ -53,7 +55,7 @@ static int prepare(struct jval *body,struct sb *out){
     rb_media_origin("IPTV selected stream",selected);
     state_lock();if(!S->iptv_active||strcmp(S->iptv_token,token)){state_unlock();return fail("IPTV preparation cancelled");}
     snprintf(S->iptv_url,sizeof S->iptv_url,"%s",selected);snprintf(S->iptv_ua,sizeof S->iptv_ua,"%s",c->ua);snprintf(S->iptv_ref,sizeof S->iptv_ref,"%s",c->ref);state_unlock();
-    sb_puts(out,"{\"ok\":true,\"type\":\"stream\",\"title\":");sb_json_str(out,c->name);sb_fmt(out,",\"live\":true,\"duration\":0,\"stream\":{\"kind\":\"moduleProxy\",\"token\":\"%s.ts\"},\"session\":\"%s\",\"transport\":{\"stop\":true,\"pause\":false,\"resume\":false,\"seek\":false}}",token,token);return 0;
+    sb_puts(out,"{\"ok\":true,\"type\":\"stream\",\"title\":");sb_json_str(out,c->name);sb_fmt(out,",\"live\":true,\"duration\":0,\"stream\":{\"kind\":\"moduleProxy\",\"token\":\"%s.ts\"},\"session\":\"%s\",\"transport\":{\"stop\":true,\"pause\":false,\"resume\":false,\"seek\":false,\"channelUp\":true,\"channelDown\":true}}",token,token);return 0;
 }
 static void status(struct sb *out){
     /* Cached library health is independent of current upstream availability. */
@@ -64,6 +66,15 @@ static void artwork(int fd,const char *id){
     struct sb bytes={0};char b[16384];int rc=0;for(;;){ssize_t n=iptv_read(&f,b,sizeof b,NULL);if(n<0){rc=-1;break;}if(!n)break;if(bytes.len+(size_t)n>512*1024||sb_putn(&bytes,b,n)){rc=-1;break;}}
     iptv_fetch_close(&f);if(rc)rb_http_error(fd,404,"artwork unavailable");else rb_http_reply(fd,200,f.ct,bytes.p,bytes.len);free(bytes.p);
 }
+static int adjacent(struct jval *body,struct sb *out){
+ const char *id=jstr(jget(body,"itemId"));double direction=jnum(jget(body,"direction"),0);if(direction!=1&&direction!=-1)return fail("invalid direction");
+ size_t at=iptv_count;for(size_t i=0;i<iptv_count;i++)if(id&&!strcmp(id,iptv_channels[i].id)){at=i;break;}if(at==iptv_count)return fail("channel no longer in playlist");
+ if(!strcmp(surf_anchor,id)&&*surf_cursor){for(size_t i=0;i<iptv_count;i++)if(!strcmp(surf_cursor,iptv_channels[i].id)){at=i;break;}}
+ size_t next=direction>0?(at+1)%iptv_count:(at+iptv_count-1)%iptv_count;
+ snprintf(surf_anchor,sizeof surf_anchor,"%s",id);snprintf(surf_cursor,sizeof surf_cursor,"%s",iptv_channels[next].id);
+ char token[33],selected[IPTV_URL_CAP+1];state_lock();snprintf(token,sizeof token,"%s",S->iptv_token);state_unlock();if(iptv_probe(&iptv_channels[next],selected,token))return -1;
+ sb_puts(out,"{\"ok\":true,\"itemId\":");sb_json_str(out,iptv_channels[next].id);sb_puts(out,"}");return 0;
+}
 static void handle(int fd,const RbRequest *request){
     char path[2048];strcpy(path,request->path);char *query=strchr(path,'?');if(query)*query++=0;
     if(!strcmp(path,"/status")){struct sb out={0};status(&out);rb_http_json(fd,200,out.p);free(out.p);return;}
@@ -72,6 +83,7 @@ static void handle(int fd,const RbRequest *request){
     pthread_mutex_lock(&operation_mutex);iptv_reload();struct sb out={0};struct jval *body=json_parse(*request->body?request->body:"{}",*request->body?request->length:2);int rc=0,code=200;
     if(!body||body->t!=J_OBJ){code=400;goto done;}
     if(!strcmp(path,"/browse")||!strcmp(path,"/search"))rc=browse(query,!strcmp(path,"/search"),&out);
+    else if(!strcmp(path,"/adjacent"))rc=adjacent(body,&out);
     else if(!strcmp(path,"/play"))rc=prepare(body,&out);
     else if(!strcmp(path,"/legacy/groups")||!strcmp(path,"/legacy/channels"))rc=iptv_library_api(!strcmp(path,"/legacy/groups")?"/api/iptv/groups":"/api/iptv/channels",query,&out);
     else if(!strcmp(path,"/legacy/state"))rc=iptv_state(!strcmp(request->method,"POST")?body:NULL,&out);

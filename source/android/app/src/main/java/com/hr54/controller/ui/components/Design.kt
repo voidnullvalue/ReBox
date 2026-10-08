@@ -231,6 +231,8 @@ fun TransportControls(
             ) {
                 Text("+30", style = MaterialTheme.typography.labelLarge)
             }
+        if (playback.transport.channelDown) TextButton(onClick = { act("channelDown") }, enabled = !busy) { Text("CH−") }
+        if (playback.transport.channelUp) TextButton(onClick = { act("channelUp") }, enabled = !busy) { Text("CH+") }
         if (playback.transport.stop)
             IconButton(onClick = { act("stop") }, enabled = !busy) {
                 Icon(AppIcons.Stop, "Stop playback")

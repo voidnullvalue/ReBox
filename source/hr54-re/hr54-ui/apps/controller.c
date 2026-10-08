@@ -74,6 +74,11 @@ void app_key(void *ctx,KeyEvent ev){App *a=ctx;if(!ev.pressed)return;
     if(ev.key==KEY_STOP){if(a->native_app_running){a->native_app_returning=1;api_module_native(&a->api,a->active_native_module,"stop");}else if(a->playback.playing||a->awaiting==API_PLAY){a->cancel_play=1;api_playback_stop(&a->api);}return;}
     if((ev.key==KEY_PLAY||ev.key==KEY_PAUSE)&&a->playback.playing){int resume=a->playback.paused;if(ev.key==KEY_PLAY&&!resume)return;if(resume?a->playback.can_resume:a->playback.can_pause){if(!api_playback_pause(&a->api,resume)){a->loading=1;a->player_until=now+5000;screen(a,SCREEN_PLAYER);}}else notice(a,"This transport operation is unavailable.");return;}
     if((ev.key==KEY_FORWARD||ev.key==KEY_REWIND||ev.key==KEY_SKIP_FORWARD||ev.key==KEY_SKIP_BACK)&&a->playback.playing){if(a->playback.can_seek){a->loading=1;api_playback_seek(&a->api,ev.key==KEY_FORWARD||ev.key==KEY_SKIP_FORWARD?30:ev.key==KEY_SKIP_BACK?-10:-30);a->player_until=now+5000;screen(a,SCREEN_PLAYER);}else notice(a,"Seeking is unavailable.");return;}
+    if((ev.key==KEY_CHANNEL_UP||ev.key==KEY_CHANNEL_DOWN)&&a->playback.playing&&(ev.key==KEY_CHANNEL_UP?a->playback.can_channel_up:a->playback.can_channel_down)){
+        if(api_busy(&a->api,API_OPERATION)||a->awaiting==API_PLAY)return;
+        a->awaiting=API_PLAY;a->cancel_play=0;a->channel_changing=1;a->loading=1;a->player_until=0;ui_copy(a->operation_module,sizeof a->operation_module,a->playback.source);screen(a,SCREEN_PLAYER);
+        if(api_channel_step(&a->api,ev.key==KEY_CHANNEL_UP?1:-1)){a->awaiting=0;a->channel_changing=0;a->loading=0;screen(a,SCREEN_HIDDEN);notice(a,"Channel change unavailable.");}return;
+    }
     if(ev.key==KEY_INFO&&a->playback.playing){a->player_until=now+5000;screen(a,SCREEN_PLAYER);return;}
     if(a->screen==SCREEN_STARTUP)return;
     if(a->screen==SCREEN_HOME){if((ev.key==KEY_LEFT||ev.key==KEY_RIGHT)&&a->home_count){int delta=ev.key==KEY_RIGHT?1:-1;a->home_motion=a->home_motion*(1000-ui_transition_progress(a->animate_start,now))/1000+delta*1000;a->home_from=a->home;a->home=(a->home+delta+a->home_count)%a->home_count;a->home_direction=delta;a->animate_start=now;}else if(ev.key==KEY_DOWN||ev.key==KEY_UP){a->settings_focus=0;screen(a,SCREEN_SETTINGS);}else if(ev.key==KEY_SELECT)open_module(a);else if(ev.key==KEY_BACK){screen(a,a->playback.playing?SCREEN_HIDDEN:SCREEN_HOME);api_tv_exit(&a->api);}return;}
@@ -102,7 +107,7 @@ void app_response(void *ctx,const ApiResponse *r){App *a=ctx;
         else rc=api_parse_operation(r,&operation);
         if(rc)error=API_MALFORMED;
     }
-    if(error!=API_OK){free(modules);
+    if(error!=API_OK){free(modules);if(r->kind==API_PLAY){a->awaiting=0;if(a->screen==SCREEN_HIDDEN||a->channel_changing){int show=a->channel_changing&&a->screen==SCREEN_PLAYER;a->channel_changing=0;a->loading=0;a->player_until=show?ui_now()+3500:0;if(show)screen(a,SCREEN_PLAYER);notice(a,api_error_message(error));a->next_status=0;return;}}
         if(*a->opening_module&&(r->kind==API_MODULE_OPEN||r->kind==API_STOP||r->kind==API_NATIVE_STOP)){opening_failed(a);return;}
         if(r->kind==API_STATE){if(a->status_failures<6)a->status_failures++;a->next_status=ui_now()+(uint64_t)(1<<a->status_failures)*1000;return;}
         if(r->kind==API_READY){a->next_status=ui_now()+2000;ui_copy(a->message,sizeof a->message,"Waiting for the receiver service");a->dirty=1;return;}
@@ -135,10 +140,10 @@ void app_response(void *ctx,const ApiResponse *r){App *a=ctx;
     case API_MODULE_STATUS:a->loading=0;if(operation.authenticated){a->awaiting=API_MEDIA;}else{ui_copy(a->managed_module,sizeof a->managed_module,a->active_module);a->awaiting=API_MODULE_SETTINGS;}break;
     case API_MEDIA:{BrowseNode *n=app_node(a);a->loading=0;n->offset=a->media.offset;if(n->selection>=a->media.count)n->selection=a->media.count?a->media.count-1:0;a->art_due=ui_now()+100;break;}
     case API_STATE:{a->status_failures=0;if(strcmp(a->playback.instance,playback.instance)){a->observed_play_generation=0;a->revealed_play_generation=0;}if(playback.generation<a->observed_play_generation)break;int ended=a->playback.playing&&!playback.playing;int committed=playback.playing&&playback.generation>a->observed_play_generation;
-        if(committed){a->observed_play_generation=playback.generation;if(!a->awaiting&&(a->screen==SCREEN_HOME||a->screen==SCREEN_BROWSER||a->screen==SCREEN_DETAILS)){a->return_screen=a->screen;ui_copy(a->return_module,sizeof a->return_module,a->active_module);}if(!*a->opening_module&&a->revealed_play_generation!=playback.generation)screen(a,SCREEN_HIDDEN);}
+        if(committed){a->observed_play_generation=playback.generation;if(!a->awaiting&&(a->screen==SCREEN_HOME||a->screen==SCREEN_BROWSER||a->screen==SCREEN_DETAILS)){a->return_screen=a->screen;ui_copy(a->return_module,sizeof a->return_module,a->active_module);}if(!*a->opening_module&&!a->channel_changing&&a->revealed_play_generation!=playback.generation)screen(a,SCREEN_HIDDEN);}
         if(memcmp(&a->playback,&playback,sizeof playback))a->dirty=1;a->playback=playback;
         if(ended&&(a->screen==SCREEN_HIDDEN||a->screen==SCREEN_PLAYER)&&a->awaiting!=API_PLAY){a->loading=0;a->player_until=0;playback_return(a);}break;}
-    case API_PLAY:a->awaiting=0;a->loading=0;a->playback=playback;a->observed_play_generation=playback.generation;if(a->cancel_play)a->stop_after_play=1;else if(a->screen==SCREEN_PLAYER)screen(a,SCREEN_HIDDEN);a->next_status=0;break;
+    case API_PLAY:a->awaiting=0;a->loading=0;a->playback=playback;a->observed_play_generation=playback.generation;if(a->cancel_play)a->stop_after_play=1;else if(a->screen==SCREEN_PLAYER){if(a->channel_changing)a->player_until=ui_now()+5000;else screen(a,SCREEN_HIDDEN);}a->channel_changing=0;a->next_status=0;break;
     case API_STOP:if(*a->opening_module){if(playback.playing)opening_failed(a);else{a->playback=playback;continue_opening(a);}break;}a->loading=0;if(a->awaiting!=API_PLAY){a->playback.playing=0;playback_return(a);}break;
     case API_PAUSE:case API_SEEK:a->loading=0;a->playback=playback;a->next_status=0;break;
     case API_MODULE_SETTINGS:case API_MODULE_SAVE:a->loading=0;if(r->kind==API_MODULE_SAVE)notice(a,"Module settings saved.");break;

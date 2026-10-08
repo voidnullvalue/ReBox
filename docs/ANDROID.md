@@ -33,3 +33,7 @@ debug/signing identity, which may not match this APK for future in-place updates
 Jellyfin play requests use `returnToTv=false`; native mode never requests stock
 satellite/setup presentation. API reproduction and an actual phone-originated
 request are separate acceptance checks.
+
+The radio/surfing update rebuilds the controller with capability-driven CH+/CH−
+controls. All 55 host tests pass. The packaged APK retains the preceding APK’s
+signing certificate. Its current SHA-256 is `0b4ffa3d05659ea684832a147d1953773b5e22f5b2125802c6ebb2d79a2cbfb8`.

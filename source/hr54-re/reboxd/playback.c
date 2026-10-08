@@ -8,7 +8,7 @@
 
 typedef struct {
     char module[64], item[256], title[256], session[256], token[128], url[2048];
-    int playing, preparing, paused, live, stop, pause, resume, seek;
+    int playing, preparing, paused, live, stop, pause, resume, seek, channel_up, channel_down;
     int claimed, opening, cancelled;
     unsigned generation;
     uint64_t epoch;
@@ -140,6 +140,7 @@ static int commit_plan(Playback *next, struct jval *plan, struct sb *out) {
     next->pause = jbool(jget(transport, "pause"), 0);
     next->resume = jbool(jget(transport, "resume"), 0);
     next->seek = jbool(jget(transport, "seek"), 0);
+    next->channel_up=jbool(jget(transport,"channelUp"),0);next->channel_down=jbool(jget(transport,"channelDown"),0);
     next->duration = jnum(jget(plan, "duration"), 0);
     next->position = jnum(jget(plan, "position"), next->position);
     next->live = jbool(jget(plan, "live"), 0);
@@ -195,6 +196,15 @@ int rb_play(ReboxRegistry *r, ReboxModule *m, const char *body, struct sb *out) 
 int rb_transport(ReboxRegistry *r, const char *operation, const char *body, struct sb *out) {
     (void)r;
     Playback s = snapshot();
+    if(!strcmp(operation,"channelUp")||!strcmp(operation,"channelDown")){
+        if(!s.playing||!s.live||s.preparing||(!strcmp(operation,"channelUp")?!s.channel_up:!s.channel_down))return 409;
+        struct sb params={0};sb_puts(&params,"{\"itemId\":");sb_json_str(&params,s.item);sb_fmt(&params,",\"direction\":%d}",!strcmp(operation,"channelUp")?1:-1);
+        RbReply reply;int rc=502;char item[256]={0};
+        if(!rb_rpc(&s.provider,"POST","/adjacent",params.p,&reply,120)){struct jval *v=json_parse(reply.body.p,reply.body.len);rc=reply.status;if(rc==200&&(safe_string(jget(v,"itemId"),item,sizeof item)||!*item))rc=502;jfree(v);rb_reply_free(&reply);}free(params.p);
+        if(rc!=200)return rc;if(!current(s.epoch))return 409;
+        ReboxModule *provider=rb_registry_find(r,s.module);if(!provider)return 409;
+        struct sb plan={0};sb_puts(&plan,"{\"itemId\":");sb_json_str(&plan,item);sb_puts(&plan,"}");rc=rb_play(r,provider,plan.p,out);free(plan.p);return rc;
+    }
     int stop = !strcmp(operation, "stop");
     int supported = (stop && (s.stop || s.preparing)) || (!strcmp(operation, "pause") && s.pause) ||
         (!strcmp(operation, "resume") && s.resume) || (!strcmp(operation, "seek") && s.seek);
@@ -255,9 +265,9 @@ void rb_playback_json(struct sb *out) {
         s.playing ? "true" : "false", s.preparing ? "true" : "false", s.paused ? "true" : "false", s.live ? "true" : "false", s.generation);
     sb_json_str(out, s.module); sb_puts(out, ",\"instance\":"); sb_json_str(out,instance); sb_puts(out, ",\"itemId\":"); sb_json_str(out, s.playing ? s.item : "");
     sb_puts(out, ",\"title\":"); sb_json_str(out, s.playing ? s.title : "");
-    sb_fmt(out, ",\"elapsed\":%.0f,\"duration\":%.0f,\"transport\":{\"stop\":%s,\"pause\":%s,\"resume\":%s,\"seek\":%s}}",
+    sb_fmt(out, ",\"elapsed\":%.0f,\"duration\":%.0f,\"transport\":{\"stop\":%s,\"pause\":%s,\"resume\":%s,\"seek\":%s,\"channelUp\":%s,\"channelDown\":%s}}",
         s.playing ? elapsed(&s) : 0, s.playing ? s.duration : 0, s.playing && s.stop ? "true" : "false",
-        s.playing && s.pause ? "true" : "false", s.playing && s.resume ? "true" : "false", s.playing && s.seek ? "true" : "false");
+        s.playing && s.pause ? "true" : "false", s.playing && s.resume ? "true" : "false", s.playing && s.seek ? "true" : "false",s.playing&&s.channel_up?"true":"false",s.playing&&s.channel_down?"true":"false");
 }
 static int stream_write(int fd,const void *bytes,size_t length,unsigned epoch){
  const char *p=bytes;double deadline=mono_now()+30;

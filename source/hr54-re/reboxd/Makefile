@@ -11,13 +11,14 @@ build/registry: tests/registry.c $(LIB) $(wildcard *.h)
 build/reboxd: main.c http.c $(RUNTIME) $(LIB) $(wildcard *.h)
 	mkdir -p build
 	$(CC) $(CFLAGS) -I. -o $@ main.c http.c $(RUNTIME) $(LIB) -lm -pthread
-test: all build/test-seed build/jellyfin-module build/iptv-module build/iptv-fetch build/youtube-module build/frigate-module build/frigate-relay build/doom-module
+test: all build/test-seed build/jellyfin-module build/iptv-module build/iptv-fetch build/youtube-module build/frigate-module build/frigate-relay build/doom-module build/radio-module build/radio-audio
 	python3 tests/foundation.py
 	python3 tests/seed.py
 	python3 tests/runtime.py
 	python3 tests/installer.py
 	python3 tests/jellyfin.py
 	python3 tests/iptv.py
+	python3 tests/radio_surf.py
 	python3 tests/youtube.py
 	python3 tests/youtube_relay.py
 	python3 tests/frigate.py
@@ -72,3 +73,11 @@ build/doom-module: ../modules/doom/main.c ../modules/doom/lifecycle.inc ../modul
 build/test-seed: tests/seed.c ../modules/shared/sdk.c http.c json.c files.c
 	mkdir -p build
 	$(CC) $(CFLAGS) -I. -o $@ $^ -lm -pthread
+
+build/radio-module: ../modules/radio/main.c ../modules/radio/library.inc ../modules/radio/radio-stream.inc ../modules/shared/sdk.c http.c json.c files.c module_auth.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -DREBOX_HOST_TEST -Wno-unused-function -I. -o $@ ../modules/radio/main.c ../modules/shared/sdk.c http.c json.c files.c module_auth.c -lm -pthread
+
+build/radio-audio: ../modules/radio/audio-remux.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $< $$(pkg-config --cflags --libs libavformat libavcodec libswresample libavutil)

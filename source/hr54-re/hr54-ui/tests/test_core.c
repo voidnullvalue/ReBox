@@ -82,5 +82,10 @@ int main(void){
     app_free(app);app_init(app,1);reply(app,API_READY,"{\"ready\":true,\"frontend\":\"native\",\"mediaBusy\":true,\"nativeModule\":\"unknown-native\"}");assert(app->native_app_running&&app->screen==SCREEN_NATIVE_APP);reply(app,API_NATIVE_STATUS,"{\"running\":false}");assert(app->screen==SCREEN_HOME&&!app->native_app_running);
     Artwork art={0};ui_copy(art.pending,sizeof art.pending,"bad");assert(artwork_accept(&art,(const unsigned char *)"garbage",7,1)<0);assert(artwork_find(&art,"bad")->failed);artwork_free(&art);
     assert(sizeof(App)<256*1024);printf("PASS runtime Home 0..32, opaque navigation, search-first, URL keyboard, stale replies, generic playback/native restoration; App=%zu bytes\n",sizeof(App));
+    App *surf=calloc(1,sizeof *surf);assert(surf);app_init(surf,1);surf->screen=SCREEN_HIDDEN;surf->playback.playing=1;surf->playback.live=1;surf->playback.can_channel_up=surf->playback.can_channel_down=1;
+    assert(input_key(0x1e006)==KEY_CHANNEL_UP&&input_key(0x1e007)==KEY_CHANNEL_DOWN);
+    app_key(surf,(KeyEvent){KEY_CHANNEL_UP,1,0,0x1e006});assert(surf->screen==SCREEN_PLAYER&&surf->loading&&surf->channel_changing&&strstr(surf->api.r[API_OPERATION].request,"/api/playback/channelUp"));api_cancel(&surf->api,API_OPERATION);
+    ApiResponse failure={API_PLAY,API_FAILED,surf->api.generation,502,NULL,0};app_response(surf,&failure);assert(!surf->awaiting&&surf->screen==SCREEN_PLAYER&&!surf->loading);
+    app_key(surf,(KeyEvent){KEY_CHANNEL_DOWN,1,0,0x1e007});assert(strstr(surf->api.r[API_OPERATION].request,"/api/playback/channelDown"));api_cancel(&surf->api,API_OPERATION);app_key(surf,(KeyEvent){KEY_MENU,1,0,0});app_response(surf,&failure);assert(surf->screen==SCREEN_HOME&&!surf->channel_changing);app_free(surf);free(surf);
     app_free(app);free(app);return 0;
 }

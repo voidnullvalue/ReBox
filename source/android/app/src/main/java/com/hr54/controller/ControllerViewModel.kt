@@ -181,7 +181,7 @@ class ControllerViewModel(
     }
     fun transport(command: String, seconds: Double? = null, delta: Int? = null) = action { a ->
         val current = playback(a); update { it.copy(playback = current) }; val t = current.transport
-        val supported = when (command) { "stop" -> t.stop; "pause" -> t.pause; "resume" -> t.resume; "seek" -> t.seek; else -> false }
+        val supported = when (command) { "stop" -> t.stop; "pause" -> t.pause; "resume" -> t.resume; "seek" -> t.seek; "channelUp" -> t.channelUp; "channelDown" -> t.channelDown; else -> false }
         if (supported) a.post("/api/playback/$command", when { seconds != null -> body("seconds" to seconds); delta != null -> body("delta" to delta); else -> body() })
     }
     fun nativeApp(id: String, start: Boolean) = action { a ->

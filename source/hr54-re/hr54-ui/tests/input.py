@@ -18,18 +18,18 @@ with socket.socket() as server:
       chunk=conn.recv(n-len(data));assert chunk;data+=chunk
      return data
     conn.sendall(packet(23));assert read(12)==packet(12,16,0)
-    for expected in [0,39,8,39,0,39]:
+    for expected in [0,39,10,39,0,39]:
      n=struct.unpack('>I',read(4))[0];words=struct.unpack('>'+str(n//4-1)+'I',read(n-4))
      assert words[:3]==(0,23,1),words
      shared_count=words[3]-1;assert shared_count==0,words
      exclusive_count=words[4]-1;exclusive=words[5:]
      assert exclusive_count==expected+1 and exclusive[0]==0xe503,words
      assert len(set(exclusive))==exclusive_count,words
-     if expected==8:assert 0xe00e in exclusive and 0xe100 not in exclusive
+     if expected==10:assert 0xe00e in exclusive and 0xe100 not in exclusive
      if expected==39:assert 0xe100 in exclusive and 0xe001 in exclusive
      # The daemon sends type-7 ownership-loss notices during selective
      # release as well as an empty successful map acknowledgement.
-     if expected in (0,8):conn.sendall(packet(20,7,3,0xffffe100,0xffffe001))
+     if expected in (0,10):conn.sendall(packet(20,7,3,0xffffe100,0xffffe001))
      ack=packet(12,7,1);conn.sendall(ack[:3]);time.sleep(.005);conn.sendall(ack[3:])
     for raw in [0x1e103,0x1e103,0xe103]:
      event=packet(28,8,raw,0,0,100,1);conn.sendall(event[:7]);time.sleep(.005);conn.sendall(event[7:])

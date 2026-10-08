@@ -39,7 +39,7 @@ int api_parse_playback(const ApiResponse *r,PlaybackState *p){
     memset(p,0,sizeof *p);Json j;if(open_response(r,&j))return -1;int rc=field(&j,0,"playing")<0?-1:0;
     p->playing=boolean(&j,0,"playing");p->paused=boolean(&j,0,"paused");p->live=boolean(&j,0,"live");p->elapsed=number(&j,0,"elapsed");p->duration=number(&j,0,"duration");p->generation=(unsigned)number(&j,0,"generation");
     if(string(&j,0,"instance",p->instance,sizeof p->instance,0)||string(&j,0,"source",p->source,sizeof p->source,0)||string(&j,0,"title",p->title,sizeof p->title,0)||(p->playing&&!api_module_id(p->source)))rc=-1;
-    int t=field(&j,0,"transport");p->can_stop=boolean(&j,t,"stop");p->can_pause=boolean(&j,t,"pause");p->can_resume=boolean(&j,t,"resume");p->can_seek=boolean(&j,t,"seek");json_close(&j);return rc;
+    int t=field(&j,0,"transport");p->can_stop=boolean(&j,t,"stop");p->can_pause=boolean(&j,t,"pause");p->can_resume=boolean(&j,t,"resume");p->can_seek=boolean(&j,t,"seek");p->can_channel_up=boolean(&j,t,"channelUp");p->can_channel_down=boolean(&j,t,"channelDown");json_close(&j);return rc;
 }
 static int scalar(const Json *j,int token,char *out,size_t cap,int *quoted){
     if(token<0)return -1;JsonToken t=j->t[token];*quoted=t.type=='"';if(*quoted)return json_string(j,token,out,cap);
