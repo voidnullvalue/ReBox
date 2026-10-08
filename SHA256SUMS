@@ -3,7 +3,7 @@
 d41c7684fecafd696fb07acb8e6122cf2719aec59a2535fe35209b2494d3cf81  ./android/ReBox-controller.apk
 5765811b393a76fe280a747067ae41575881f9864c51fc0fce43d737e3c772e1  ./docs/ACCEPTANCE.md
 cae4c92b72c5785216e86d58c8d9521f1b3769ab453acdec733c6b543bf83c71  ./docs/ANDROID.md
-1700f175a3340abd22f406ef400920507bf1df7c6c617fee62b934df69cabc53  ./docs/BRANDING.md
+742fb7f9eb3b4964c8c8a889a7de374c77363e9e31dcbddbde79fd9a084972f6  ./docs/BRANDING.md
 4a772ce59bd155d5b3dab6b57b6762a6bd731e0e41460fb12952804c51019b3f  ./docs/BUILD-AND-LIMITS.md
 0c34e1aedbc903733edb6895a6bd30fb163647a954cb15de5b6dfdb08647e396  ./docs/MODULES.md
 1d07f8c3256a61d5866b4a1e5d097dc5a3f14e3b15a69a4ddb678ae4d40a0235  ./docs/PLAYBACK-20261007.md
@@ -79,7 +79,7 @@ a7e2399e62bf5df4690a7527b4042a0471165677d5ebbc14a8457b55d6d4f06f  ./receiver/pay
 8882834b37ddfbc2bad5270195e54edca08c85d266f4e4d0ec556f277329961b  ./receiver/payload/hr54-persist/payload.md5
 a18f5f67edb8270375b84d5dbd576f5ae93529629fa3042e2d8b81e2517f8bed  ./receiver/payload/hr54-persist/rebox-start.sh
 82a478228f81e8f72068edba78e87dbc9b5eea96d28c82cedb7195ffe158b629  ./receiver/payload/hr54-persist/stock-firmware.md5
-aaba66944efccd8be53df703e0a7eb43c54ab47d494362461c9bcd53a4ef18b9  ./receiver/runtime/hr54-ui
+74574217d060a22048cfb9e823f6cf42394699f7b8837af126d1296bde4fd6f1  ./receiver/runtime/hr54-ui
 d2ee89b51adb7dd2306c3539a1609af4808b82208a20d39389c762404ae50738  ./source/android/.gitignore
 49b39778878ab31ea80e15ea7fbe06ec72f9666b9a3b960781db58f7c1a54344  ./source/android/README.md
 ca89e89b616c2fea29681f38ccc36593ce414838b008ea88cd4468ac1ae66b18  ./source/android/app/build.gradle.kts
@@ -1507,10 +1507,10 @@ a4ac76cdcb00bcb00a9943ac8ef5da3841ac1a11dcd0411fa3df71371a87da39  ./source/hr54-
 649a8614c2b48e45077bce288a3c7be515b61a1fdc7e213393ae8e41e2a8123a  ./source/hr54-re/hr54-ui/api/playback.c
 59d30897d3e0ee6920f5037ccec6db3bf987f8a37963b7c5f94301db1996dbf6  ./source/hr54-re/hr54-ui/api/services.h
 4782e5cc20c60c769f24a5848adfa58d0f49bdc7142c622972987c3d53e4d2b0  ./source/hr54-re/hr54-ui/api/system.c
-62c80db03ee5647cc2865ce887dfe907a2596806bbdca7348390b3942839d1ad  ./source/hr54-re/hr54-ui/apps/controller.c
+48620a17d57d59e20388497ad285b1fd96056c6df2edca765398434b828f61ee  ./source/hr54-re/hr54-ui/apps/controller.c
 2b508d080b18895d161a737fc904d9ac8e87cc169fc438d50cce340190c7751e  ./source/hr54-re/hr54-ui/apps/fixtures.c
 f1e9247d05a74b059ec04180b064cdd4c3491bf347c64313878f96f89c26b09a  ./source/hr54-re/hr54-ui/apps/preview_art.h
-dc5f67cec60f8221a8c6f65b5d6e0cd81dfac78458f5df9558d31a1e7c41039e  ./source/hr54-re/hr54-ui/apps/state.h
+95757bdcba96c97ed4bd51062e08a9fe8aa1d7c3dde13d2146e2888baa5657c9  ./source/hr54-re/hr54-ui/apps/state.h
 6d4e2239c9605f95e1031309e8bd156dec62c55817427655003c57baceafb1e2  ./source/hr54-re/hr54-ui/assets/JELLYFIN-LICENSE.txt
 0dab92d0544f7b233403f14b84a663bdbfa746982eda629e7f4f9ffe1b036feb  ./source/hr54-re/hr54-ui/assets/NotoSans-OFL.txt
 478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823  ./source/hr54-re/hr54-ui/assets/NotoSans-Regular.ttf
@@ -1556,7 +1556,7 @@ b1d36e192a6eab620635ae9574f09a74d3ba8319880ba971c7bb4da87d01ed40  ./source/hr54-
 a615c6994886f971a524e3c2d1b52518f9856a514d25a9a526f3b3bf0e38b2c3  ./source/hr54-re/hr54-ui/tests/test_artwork.c
 fa26bdef96e4f622d88e3f356e1a784196000a3fead731c125b678bec323a282  ./source/hr54-re/hr54-ui/tests/test_backend_stop.c
 8c6272cfa26d12daf5407c84fbf30406dcf942372c2a94c14bb132f886ba1d8a  ./source/hr54-re/hr54-ui/tests/test_client.c
-8a6302b1ef28f649e89b193b6687dee065076d5b0b9b1aaa8f62da747e337748  ./source/hr54-re/hr54-ui/tests/test_core.c
+bfa7cdc158ea994d01ddd24ebcb0e64ef8df7afdb4b4696727a49791d287d424  ./source/hr54-re/hr54-ui/tests/test_core.c
 a2732e856c1802fb5cbe31e024a6f410ac589e40fb9f7730757a1fdd6b8207cf  ./source/hr54-re/hr54-ui/tests/test_input.c
 59ae8a3d95b8c857fe19d9166e7b4d8c09d69c28932ff7a0b95fdd425d063e82  ./source/hr54-re/hr54-ui/tests/test_modules.c
 e90c68e032133764605552e8bb4ff72aad5d551a1bc3f211d1f6e5fb482cea0a  ./source/hr54-re/hr54-ui/tests/youtube_e2e.py
@@ -1845,7 +1845,7 @@ e8559e6478803863aba6aba93944e7f1b749768462d5da76268b6de9176ff407  ./tools/recv/h
 f63bd7ce2009e009caa509bfb62e9e4399bb86f7c806512cfdbb24aae7438c17  ./tools/recv/legacy-runtime-entry.sh
 8e37d3e4507211d5c32386ece7e8e44025189f3cfc052c8777ac75a4c7a97bd3  ./tools/recv/runtime-activate.sh
 db2492cadef6d42cd0cf82ee5705ec320615bc79f22c2303aaca5040515d3f72  ./tools/recv/runtime-rollback.sh
-e2d1a84b5193b9c554fd7f967b6eaedcf4a0cf6182079acafa6edc4bc5341d4c  ./tools/rejoin-provider-runtime.sh
+ed788e80d985b0010bba99cd88988cb529ab44909516be7aa40414da4dae4e8d  ./tools/rejoin-provider-runtime.sh
 17ae6c3206a80d9bf2574964dd945360b2bc1e089a82b64e34366d666a3a54a0  ./tools/test-install-lifecycle.py
 fd1deb28c01edd64d2efc2f8c83556a53dcf5ddddb838e5f478cb57eca4129a7  ./tools/tftp-get.py
 18b1f31f425f868e58575e27d73cf49654bc2dceac3bb34f8e16deb3794a6686  ./tools/update-receiver-branding.sh

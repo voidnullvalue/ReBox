@@ -16,7 +16,7 @@ typedef struct {
     BrowseNode navigation[NAV_DEPTH];int depth;MediaList media;ModuleSettings module_settings;
     int home,settings_focus,module_focus,keyboard_focus,keyboard_upper,ready,frontend_prepared,still,start_hidden;
     int loading,dirty,visible,native_app_running,native_app_starting,native_app_returning,native_release_surface,native_release_input,input_active,surface_open,status_failures;
-    int module_open_stops;
+    int module_open_stops,opening_prepare;
     int awaiting,player_focus,cancel_play,stop_after_play,edit_field,management_pair,refresh_modules;
     KeyboardMode keyboard_mode;char query[65],entry[1025],pair_code[40],poll_action[64],message[256],notice[160];
     uint64_t next_status,next_modules,next_action,prepare_due,animate_start,last_key,notice_until,art_due,player_until;

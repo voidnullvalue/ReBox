@@ -11,7 +11,7 @@ cp -p "$menu/hr54-ui" "$work/previous/hr54-ui"
 (cd "$work/original"; tar -xf "$base/backup/restore-from-ReBox-20261007/before.tar" rebox-start.sh jellyfin/bin/hr54-jf)
 [ "$(md5sum "$work/original/jellyfin/bin/hr54-jf" | cut -d' ' -f1)" = 804613d0f5b41984d0b65f38397f3780 ]
 [ "$(md5sum "$base/rebox/bin/reboxd" | cut -d' ' -f1)" = 0ae19ef10716fd04cad1569ec1463835 ]
-[ "$(md5sum /var/hr54-transfer/rebox-switch-ui-20261007 | cut -d' ' -f1)" = 88867a7541293669390acb48734ca953 ]
+[ "$(md5sum /var/hr54-transfer/rebox-prepare-ui-20261008 | cut -d' ' -f1)" = 52868f7a8d34fbe5b1b23bd5185c4ddd ]
 boot=$(cat /proc/sys/kernel/random/boot_id)
 policy=$(cat "$menu/policy.md5")
 case "$(cat "$menu/loaded-boot")" in "$boot:$policy:"*:native) :;; *) exit 1;; esac
@@ -44,7 +44,7 @@ mv "$base/rebox-start.sh.next" "$base/rebox-start.sh"
 cp -p "$work/original/jellyfin/bin/hr54-jf" "$base/jellyfin/bin/hr54-jf.next"
 chmod 700 "$base/jellyfin/bin/hr54-jf.next"
 mv "$base/jellyfin/bin/hr54-jf.next" "$base/jellyfin/bin/hr54-jf"
-cp /var/hr54-transfer/rebox-switch-ui-20261007 "$menu/hr54-ui.next"
+cp /var/hr54-transfer/rebox-prepare-ui-20261008 "$menu/hr54-ui.next"
 chmod 700 "$menu/hr54-ui.next"
 mv "$menu/hr54-ui.next" "$menu/hr54-ui"
 printf '%s\n' "$work" > "$base/provider-repair-path"

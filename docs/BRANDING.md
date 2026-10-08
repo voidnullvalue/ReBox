@@ -37,7 +37,9 @@ reloading middleware. Its backups are under
 
 Opening any receiver Home module now checks live core ownership, cleanly stops
 previous media playback or a native app, and rechecks idle readiness before
-entering the chosen module. A failed stop retains Home and displays a retry
+entering the chosen module. Browsing starts only after remote-control
+preparation succeeds; temporary preparation failures retry automatically
+without asking the user to press MENU. A failed stop retains Home and displays a retry
 message. The selected module ID remains fixed while the handoff runs; MENU,
 BACK and EXIT cancel a pending opening. Tests cover media-to-browser,
 native-to-browser, media-to-native, stale playback status, and failed stops.

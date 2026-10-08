@@ -25,7 +25,7 @@ static void enter_module(App *a,const char *id){const ModuleDescriptor *m=app_mo
     if(m->native_app){ui_copy(a->active_native_module,sizeof a->active_native_module,m->id);a->native_release_surface=m->release_surface;a->native_release_input=m->release_input;a->native_app_starting=1;a->return_screen=SCREEN_HOME;screen(a,SCREEN_NATIVE_APP);return;}
     if(m->auth){char path[128];snprintf(path,sizeof path,"/api/modules/%s/status",m->id);a->loading=1;if(api_send(&a->api,API_BROWSE,API_MODULE_STATUS,"GET",path,NULL,120000))app_error(a,API_FAILED);}else browse_open(a);
 }
-static void opening_failed(App *a){a->opening_module[0]=0;a->module_open_stops=0;a->loading=0;notice(a,"Could not stop the previous module. Please retry.");}
+static void opening_failed(App *a){a->opening_prepare=0;a->opening_module[0]=0;a->module_open_stops=0;a->loading=0;notice(a,"Could not stop the previous module. Please retry.");}
 static void open_module(App *a){const ModuleDescriptor *m=app_home_module(a,a->home);if(!m)return;
     if(*a->opening_module||api_busy(&a->api,API_OPERATION)||api_busy(&a->api,API_CONTROL)){notice(a,"Please wait for the current operation.");return;}
     if(!m->healthy){notice(a,*m->error?m->error:"Module unavailable. Open Settings → Modules.");return;}
@@ -33,6 +33,8 @@ static void open_module(App *a){const ModuleDescriptor *m=app_home_module(a,a->h
     if(api_module_open(&a->api))opening_failed(a);
 }
 static void continue_opening(App *a){if(api_module_open(&a->api))opening_failed(a);}
+static void finish_opening(App *a){char id[64];ui_copy(id,sizeof id,a->opening_module);a->opening_module[0]=0;a->module_open_stops=a->opening_prepare=0;enter_module(a,id);}
+
 
 static void push_node(App *a,const char *parent,const char *title,const char *query){if(a->depth+1>=NAV_DEPTH){notice(a,"This folder is too deep to open.");return;}BrowseNode *n=&a->navigation[++a->depth];memset(n,0,sizeof *n);ui_copy(n->parent,sizeof n->parent,parent);ui_copy(n->title,sizeof n->title,title);ui_copy(n->query,sizeof n->query,query);app_load(a);}
 static void play(App *a){const MediaItem *item=app_selected(a);if(!item||!item->playable){notice(a,"This item is not available for playback.");return;}if(api_busy(&a->api,API_OPERATION)){notice(a,"Please wait for the current operation.");return;}a->return_screen=a->screen;ui_copy(a->return_module,sizeof a->return_module,a->active_module);ui_copy(a->operation_module,sizeof a->operation_module,a->active_module);a->loading=1;a->cancel_play=0;a->awaiting=API_PLAY;screen(a,SCREEN_PLAYER);ui_copy(a->playback.title,sizeof a->playback.title,item->title);if(api_module_play(&a->api,a->active_module,item))app_error(a,API_FAILED);}
@@ -66,7 +68,7 @@ void app_key(void *ctx,KeyEvent ev){App *a=ctx;if(!ev.pressed)return;
     int can_adjust=a->screen==SCREEN_MODULE_SETTINGS&&a->settings_focus<a->module_settings.field_count&&(a->module_settings.fields[a->settings_focus].type==FIELD_CHOICE||a->module_settings.fields[a->settings_focus].type==FIELD_BOOL);
     if(ev.key==KEY_LEFT&&!can_adjust&&(a->screen==SCREEN_BROWSER||a->screen==SCREEN_DETAILS||a->screen==SCREEN_PLAYER||a->screen==SCREEN_PAIR||a->screen==SCREEN_ERROR||a->screen==SCREEN_SETTINGS||a->screen>=SCREEN_MODULES))ev.key=KEY_BACK;
     uint64_t now=ui_now();int direction=ev.key==KEY_UP||ev.key==KEY_DOWN||ev.key==KEY_LEFT||ev.key==KEY_RIGHT;if(ev.repeat&&(!direction||now-a->last_key<90))return;a->last_key=now;a->dirty=1;
-    if(*a->opening_module&&(ev.key==KEY_GUIDE||ev.key==KEY_MENU||ev.key==KEY_BACK||ev.key==KEY_EXIT)){a->opening_module[0]=0;a->module_open_stops=0;a->loading=0;api_cancel(&a->api,API_OPERATION);}
+    if(*a->opening_module&&(ev.key==KEY_GUIDE||ev.key==KEY_MENU||ev.key==KEY_BACK||ev.key==KEY_EXIT)){a->opening_module[0]=0;a->module_open_stops=a->opening_prepare=0;a->loading=0;api_cancel(&a->api,API_OPERATION);}
     if(ev.key==KEY_GUIDE||ev.key==KEY_MENU){a->revealed_play_generation=a->playback.generation;a->frontend_prepared=0;a->prepare_due=0;invalidate(a);a->refresh_modules=1;if(a->native_app_starting){a->native_app_starting=0;screen(a,SCREEN_HOME);}else if(a->native_app_running||a->api.r[API_OPERATION].kind==API_NATIVE_START){a->native_app_returning=1;if(a->native_app_running)api_module_native(&a->api,a->active_native_module,"stop");}else screen(a,SCREEN_HOME);return;}
     if(ev.key==KEY_EXIT){screen(a,a->playback.playing?SCREEN_HIDDEN:SCREEN_HOME);api_tv_exit(&a->api);return;}
     if(ev.key==KEY_STOP){if(a->native_app_running){a->native_app_returning=1;api_module_native(&a->api,a->active_native_module,"stop");}else if(a->playback.playing||a->awaiting==API_PLAY){a->cancel_play=1;api_playback_stop(&a->api);}return;}
@@ -104,7 +106,7 @@ void app_response(void *ctx,const ApiResponse *r){App *a=ctx;
         if(*a->opening_module&&(r->kind==API_MODULE_OPEN||r->kind==API_STOP||r->kind==API_NATIVE_STOP)){opening_failed(a);return;}
         if(r->kind==API_STATE){if(a->status_failures<6)a->status_failures++;a->next_status=ui_now()+(uint64_t)(1<<a->status_failures)*1000;return;}
         if(r->kind==API_READY){a->next_status=ui_now()+2000;ui_copy(a->message,sizeof a->message,"Waiting for the receiver service");a->dirty=1;return;}
-        if(r->kind==API_PREPARE){a->frontend_prepared=0;a->prepare_due=UINT64_MAX;notice(a,"Preparing remote control. Press MENU to retry.");return;}
+        if(r->kind==API_PREPARE){a->frontend_prepared=0;a->prepare_due=ui_now()+1000;a->dirty=1;return;}
         if(r->kind==API_MODULES&&a->modules_loaded){notice(a,"Could not refresh modules.");return;}
         if(r->kind==API_NATIVE_STATUS||r->kind==API_EXIT){notice(a,api_error_message(error));return;}
         if(r->kind==API_NATIVE_START||r->kind==API_NATIVE_STOP){a->native_app_starting=0;a->native_app_running=1;a->native_app_returning=1;a->next_status=0;screen(a,SCREEN_NATIVE_APP);notice(a,api_error_message(error));return;}
@@ -119,12 +121,16 @@ void app_response(void *ctx,const ApiResponse *r){App *a=ctx;
             if(a->module_open_stops++>=2){opening_failed(a);break;}
             int rc=*operation.native_module?api_module_native(&a->api,operation.native_module,"stop"):api_playback_stop(&a->api);
             if(rc)opening_failed(a);
-        }else{char id[64];ui_copy(id,sizeof id,a->opening_module);a->opening_module[0]=0;a->module_open_stops=0;a->native_app_running=a->native_app_starting=a->native_app_returning=0;a->active_native_module[0]=0;a->playback.playing=0;a->frontend_prepared=0;a->prepare_due=0;enter_module(a,id);}
+        }else{a->native_app_running=a->native_app_starting=a->native_app_returning=0;a->active_native_module[0]=0;a->playback.playing=0;
+            const ModuleDescriptor *target=app_module(a,a->opening_module);
+            if((target&&target->native_app)||a->frontend_prepared)finish_opening(a);
+            else{a->opening_prepare=1;a->prepare_due=0;}
+        }
         break;
     case API_READY:a->ready=operation.ready;a->refresh_modules=1;
         if(*operation.native_module){ui_copy(a->active_native_module,sizeof a->active_native_module,operation.native_module);a->native_app_running=1;a->native_release_input=a->native_release_surface=1;screen(a,SCREEN_NATIVE_APP);}
         else{screen(a,a->start_hidden?SCREEN_HIDDEN:SCREEN_HOME);a->start_hidden=0;}break;
-    case API_PREPARE:a->frontend_prepared=operation.prepared;break;
+    case API_PREPARE:a->frontend_prepared=operation.prepared;if(*a->opening_module&&a->opening_prepare)finish_opening(a);break;
     case API_MODULES:{char selected[64]="";const ModuleDescriptor *old=app_home_module(a,a->home);if(old)ui_copy(selected,sizeof selected,old->id);if(memcmp(&a->modules,modules,sizeof *modules)){artwork_reset(&a->artwork);api_cancel(&a->api,API_ARTWORK);++a->api.generation;}a->modules=*modules;a->home_count=0;app_rebuild_home(a);for(int i=0;i<a->home_count;i++)if(!strcmp(app_home_module(a,i)->id,selected))a->home=i;a->modules_loaded=1;a->loading=0;a->next_modules=ui_now()+5000;if(a->screen==SCREEN_MODULES&&a->settings_focus>=a->modules.count+2)a->settings_focus=0;break;}
     case API_MODULE_STATUS:a->loading=0;if(operation.authenticated){a->awaiting=API_MEDIA;}else{ui_copy(a->managed_module,sizeof a->managed_module,a->active_module);a->awaiting=API_MODULE_SETTINGS;}break;
     case API_MEDIA:{BrowseNode *n=app_node(a);a->loading=0;n->offset=a->media.offset;if(n->selection>=a->media.count)n->selection=a->media.count?a->media.count-1:0;a->art_due=ui_now()+100;break;}
@@ -151,11 +157,12 @@ void app_tick(App *a,uint64_t now){if(artwork_poll(&a->artwork,a->api.generation
     if(!api_busy(&a->api,API_BROWSE)){if(a->awaiting==API_MEDIA){a->awaiting=0;browse_open(a);}else if(a->awaiting==API_MODULE_SETTINGS){a->awaiting=0;module_settings(a,a->managed_module);}
         else if(a->ready&&!*a->opening_module&&(a->refresh_modules||((a->screen==SCREEN_HOME||a->screen==SCREEN_MODULES)&&now>=a->next_modules))){a->refresh_modules=0;a->next_modules=now+5000;api_modules(&a->api);}
         else if(a->screen==SCREEN_PAIR&&*a->poll_action&&now>=a->next_action){a->next_action=now+2000;api_module_action(&a->api,a->managed_module,a->poll_action);}}
+    if(*a->opening_module&&a->opening_prepare&&now>=a->prepare_due&&!api_busy(&a->api,API_CONTROL)&&!api_busy(&a->api,API_OPERATION)){a->prepare_due=UINT64_MAX;if(api_system_prepare(&a->api))a->prepare_due=now+1000;}
     if(a->native_app_returning&&a->native_app_running&&!api_busy(&a->api,API_CONTROL)&&!api_busy(&a->api,API_OPERATION)){if(!api_module_native(&a->api,a->active_native_module,"stop"))a->native_app_returning=0;}
     if(a->stop_after_play&&!api_busy(&a->api,API_CONTROL)){a->stop_after_play=0;api_playback_stop(&a->api);}
     if(a->notice_until&&now>=a->notice_until){a->notice[0]=0;a->notice_until=0;a->dirty=1;}
     if(a->screen==SCREEN_PLAYER&&a->player_until&&now>=a->player_until&&!a->loading){a->player_until=0;screen(a,a->playback.playing?SCREEN_HIDDEN:SCREEN_HOME);}
-    if(a->ready&&!*a->opening_module&&!a->frontend_prepared&&!a->native_app_running&&a->screen!=SCREEN_NATIVE_APP&&a->screen!=SCREEN_HIDDEN&&now>=a->prepare_due&&!api_busy(&a->api,API_CONTROL)){a->prepare_due=UINT64_MAX;if(api_system_prepare(&a->api)){a->prepare_due=now+2000;notice(a,"Preparing remote control.");}}
+    if(a->ready&&!*a->opening_module&&!a->frontend_prepared&&!a->native_app_running&&a->screen!=SCREEN_NATIVE_APP&&a->screen!=SCREEN_HIDDEN&&now>=a->prepare_due&&!api_busy(&a->api,API_CONTROL)){a->prepare_due=UINT64_MAX;if(api_system_prepare(&a->api)){a->prepare_due=now+1000;a->dirty=1;}}
     if(now>=a->next_status&&!api_busy(&a->api,API_STATUS)){a->next_status=now+1000;if(!a->ready)api_system_ready(&a->api);else if(a->native_app_running)api_module_native(&a->api,a->active_native_module,"status");else api_playback_state(&a->api);}
     if(a->artwork.job||api_busy(&a->api,API_ARTWORK)||now<a->art_due)return;
     if((a->screen==SCREEN_BROWSER||a->screen==SCREEN_DETAILS)&&!a->loading){const MediaItem *x=app_selected(a);if(x&&*x->artwork)request_image(a,a->active_module,x->artwork);}

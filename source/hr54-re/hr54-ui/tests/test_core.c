@@ -3,7 +3,7 @@
 #include "ui/image.h"
 #include <assert.h>
 static void key(App *a,UiKey k);
-static void reply(App *a,ApiKind kind,const char *json){ApiResponse r={kind,API_OK,a->api.generation,200,(const unsigned char *)json,strlen(json)};app_response(a,&r);}
+static void reply(App *a,ApiKind kind,const char *json){ApiResponse r={kind,API_OK,a->api.generation,200,(const unsigned char *)json,strlen(json)};app_response(a,&r);if(kind==API_MODULE_OPEN&&a->opening_prepare){api_cancel(&a->api,API_CONTROL);ApiResponse prepared={API_PREPARE,API_OK,a->api.generation,200,(const unsigned char *)"{\"prepared\":true}",17};app_response(a,&prepared);}}
 static void key(App *a,UiKey k){app_key(a,(KeyEvent){k,1,0,0});if(a->api.r[API_OPERATION].kind==API_MODULE_OPEN&&api_busy(&a->api,API_OPERATION)){api_cancel(&a->api,API_OPERATION);reply(a,API_MODULE_OPEN,"{\"ready\":true,\"frontend\":\"native\",\"nativeModule\":\"\",\"mediaBusy\":false}");}}
 int main(void){
     /* Shrinking must average fine detail and preserve colored transparent edges. */
@@ -31,6 +31,11 @@ int main(void){
     app_key(handoff,(KeyEvent){KEY_SELECT,1,0,0});api_cancel(&handoff->api,API_OPERATION);reply(handoff,API_MODULE_OPEN,"{\"ready\":true,\"frontend\":\"native\",\"nativeModule\":\"\",\"mediaBusy\":true}");assert(!handoff->native_app_starting&&handoff->screen==SCREEN_HOME);
     reply(handoff,API_STATE,"{\"playing\":true,\"source\":\"camera\",\"generation\":1}");assert(handoff->screen==SCREEN_HOME);
     api_cancel(&handoff->api,API_CONTROL);reply(handoff,API_STOP,"{\"playing\":false,\"transport\":{}}");api_cancel(&handoff->api,API_OPERATION);reply(handoff,API_MODULE_OPEN,"{\"ready\":true,\"frontend\":\"native\",\"nativeModule\":\"\",\"mediaBusy\":false}");assert(handoff->native_app_starting&&handoff->screen==SCREEN_NATIVE_APP);
+    app_free(handoff);app_init(handoff,1);app_fixture(handoff,"home-five");handoff->frontend_prepared=0;app_key(handoff,(KeyEvent){KEY_SELECT,1,0,0});api_cancel(&handoff->api,API_OPERATION);
+    ApiResponse idle={API_MODULE_OPEN,API_OK,handoff->api.generation,200,(const unsigned char *)"{\"ready\":true,\"frontend\":\"native\",\"nativeModule\":\"\",\"mediaBusy\":false}",77};idle.length=strlen((const char *)idle.bytes);app_response(handoff,&idle);
+    assert(handoff->opening_prepare&&handoff->screen==SCREEN_HOME&&!api_busy(&handoff->api,API_BROWSE));app_tick(handoff,ui_now());assert(handoff->api.r[API_CONTROL].kind==API_PREPARE);api_cancel(&handoff->api,API_CONTROL);
+    ApiResponse busy={API_PREPARE,API_FAILED,handoff->api.generation,409,(const unsigned char *)"{}",2};app_response(handoff,&busy);assert(handoff->opening_prepare&&*handoff->opening_module&&!handoff->notice[0]&&handoff->prepare_due!=UINT64_MAX);
+    ApiResponse prepared={API_PREPARE,API_OK,handoff->api.generation,200,(const unsigned char *)"{\"prepared\":true}",17};app_response(handoff,&prepared);assert(!*handoff->opening_module&&handoff->screen==SCREEN_BROWSER&&handoff->frontend_prepared);
     app_free(handoff);free(handoff);
     Json j;
     const char *bad[]={"", "{", "[]x", "{\"x\":01}", "{\"x\":.1}", "{\"x\":tru}", "{\"x\":1,}", "[1,]", "{\"x\":\"\\q\"}", "{\"x\":\"\n\"}"};for(unsigned i=0;i<sizeof(bad)/sizeof(*bad);i++)assert(json_open(&j,bad[i],strlen(bad[i]))<0);
