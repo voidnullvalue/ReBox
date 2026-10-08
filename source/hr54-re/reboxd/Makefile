@@ -19,6 +19,7 @@ test: all build/test-seed build/jellyfin-module build/iptv-module build/iptv-fet
 	python3 tests/jellyfin.py
 	python3 tests/iptv.py
 	python3 tests/youtube.py
+	python3 tests/youtube_relay.py
 	python3 tests/frigate.py
 	python3 tests/native_app.py
 clean:

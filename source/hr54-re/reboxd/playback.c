@@ -259,6 +259,16 @@ void rb_playback_json(struct sb *out) {
         s.playing ? elapsed(&s) : 0, s.playing ? s.duration : 0, s.playing && s.stop ? "true" : "false",
         s.playing && s.pause ? "true" : "false", s.playing && s.resume ? "true" : "false", s.playing && s.seek ? "true" : "false");
 }
+static int stream_write(int fd,const void *bytes,size_t length,unsigned epoch){
+ const char *p=bytes;double deadline=mono_now()+30;
+ while(length&&current(epoch)){
+  ssize_t n=send(fd,p,length,MSG_DONTWAIT|MSG_NOSIGNAL);
+  if(n>0){p+=n;length-=n;deadline=mono_now()+30;continue;}
+  if(n<0&&errno==EINTR)continue;
+  if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK)){if(snapshot().paused)deadline=mono_now()+30;if(mono_now()>deadline)return -1;struct pollfd wait={fd,POLLOUT,0};int ready=poll(&wait,1,100);if(ready<0&&errno!=EINTR)return -1;continue;}
+  return -1;
+ }return length?-1:0;
+}
 void rb_stream_proxy(int client, const char *path) {
     char id[64]; const char *token = strchr(path, '/'); size_t n = token ? (size_t)(token - path) : 0;
     if (!n || n >= sizeof id || !token_valid(token + 1)) { rb_http_error(client, 404, "unknown stream"); return; }
@@ -300,13 +310,13 @@ void rb_stream_proxy(int client, const char *path) {
         if (!sent) {
             if ((unsigned char)bytes[0] != 0x47) { failed = 1; break; }
             const char *h = "HTTP/1.0 200 OK\r\nContent-Type: video/mp2t\r\nConnection: close\r\n\r\n";
-            if (write_all_fd(client, h, strlen(h))) { failed = 1; break; }
+            if (stream_write(client, h, strlen(h), s.epoch)) { failed = 1; break; }
             sent = 1;
             pthread_mutex_lock(&playback_lock);
             if (active.epoch == s.epoch) active.claimed = 1;
             pthread_mutex_unlock(&playback_lock);
         }
-        if (write_all_fd(client, bytes, k)) { failed = 1; break; }
+        if (stream_write(client, bytes, k, s.epoch)) { failed = 1; break; }
         deadline = mono_now() + 35;
     }
     close(fd);

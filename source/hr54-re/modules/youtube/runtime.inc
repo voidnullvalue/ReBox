@@ -42,10 +42,20 @@ static int yt_play(const char *id,struct sb *out){unsigned long generation=0;if(
  snprintf(S->yt_video,sizeof S->yt_video,"%s",video);snprintf(S->yt_audio,sizeof S->yt_audio,"%s",audio);generation=playback_begin_locked("",title?title:id,id,0,1);S->play_live=3;S->ui_return_source=0;state_unlock();char local[160];snprintf(local,sizeof local,"http://127.0.0.1:%d/youtube-stream/%s.ts",S->listen_port,token);rc=invoke_play_url(local);if(!rc){playback_setup_complete();for(double t=0;t<15&&yt_active(token);t+=0.1){state_lock();int claimed=S->yt_claimed;state_unlock();if(claimed)break;nap(0.1);}state_lock();if(!S->yt_claimed)rc=fail("Receiver did not request YouTube stream");else if(!S->yt_active)rc=fail("%s",S->yt_error[0]?S->yt_error:"YouTube stream failed");state_unlock();}}}
  jfree(v);free(result.p);if(rc){state_lock();snprintf(S->yt_error,sizeof S->yt_error,"%s",g_err);int started=S->playing&&S->play_live==3;if(started)playback_end_locked();else S->yt_active=0;state_unlock();if(started){receiver_stop();schedule_tv_return(1,POST_STOP_DISMISS);}return -1;}jf_log("YouTube playback started: %s (generation %lu)",title?title:id,generation);sb_fmt(out,"{\"playing\":true,\"source\":\"youtube\",\"generation\":%lu}",generation);return 0;}
 #endif
+static int yt_stream_write(int fd,const void *bytes,size_t length,const char *token){
+ const char *p=bytes;double deadline=mono_now()+30,blocked=0;
+ while(length&&yt_active(token)){
+  ssize_t n=send(fd,p,length,MSG_DONTWAIT|MSG_NOSIGNAL);
+  if(n>0){if(blocked){double seconds=mono_now()-blocked;if(seconds>.5)fprintf(stderr,"YouTube stream backpressure seconds=%.3f\n",seconds);blocked=0;}p+=n;length-=n;deadline=mono_now()+30;continue;}
+  if(n<0&&errno==EINTR)continue;
+  if(n<0&&(errno==EAGAIN||errno==EWOULDBLOCK)){if(!blocked)blocked=mono_now();if(mono_now()>deadline)return -1;struct pollfd wait={fd,POLLOUT,0};int ready=poll(&wait,1,100);if(ready<0&&errno!=EINTR)return -1;continue;}
+  return -1;
+ }return length?-1:0;
+}
 static void yt_stream(int fd,const char *path,const char *method){if(strcmp(method,"GET")||strlen(path)!=35||strcmp(path+32,".ts")){send_json_error(fd,404,"Unknown YouTube stream",method);return;}char token[33],video[8193],audio[8193];memcpy(token,path,32);token[32]=0;state_lock();if(!S->yt_active||strcmp(S->yt_token,token)||S->yt_claimed){state_unlock();send_json_error(fd,404,"Expired YouTube stream",method);return;}S->yt_claimed=1;S->yt_claim_at=mono_now();snprintf(video,sizeof video,"%s",S->yt_video);snprintf(audio,sizeof audio,"%s",S->yt_audio);state_unlock();alarm(0);
  int in=-1;pid_t pid=yt_spawn(&in,"",video,audio,1);int rc=pid<0,started=0;double until=mono_now()+25;char buf[32768];struct timeval timeout={3,0};setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof timeout);
  for(int attempt=0;attempt<2;attempt++){
- while(!rc&&yt_active(token)){if(mono_now()>until){rc=1;break;}struct pollfd p={in,POLLIN,0};int r=poll(&p,1,100);if(r<0&&errno==EINTR)continue;if(r<0){rc=1;break;}if(!r)continue;ssize_t n=read(in,buf,sizeof buf);if(n<=0){rc=n<0;break;}if(!started){const char *h="HTTP/1.1 200 OK\r\nContent-Type: video/mp2t\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";rc=write_all_fd(fd,h,strlen(h));started=1;}if(!rc)rc=write_all_fd(fd,buf,n);until=mono_now()+25;}
+ while(!rc&&yt_active(token)){if(mono_now()>until){rc=1;break;}struct pollfd p={in,POLLIN,0};int r=poll(&p,1,100);if(r<0&&errno==EINTR)continue;if(r<0){rc=1;break;}if(!r)continue;ssize_t n=read(in,buf,sizeof buf);if(n<=0){rc=n<0;break;}if(!started){const char *h="HTTP/1.1 200 OK\r\nContent-Type: video/mp2t\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n";rc=yt_stream_write(fd,h,strlen(h),token);started=1;}if(!rc)rc=yt_stream_write(fd,buf,n,token);until=mono_now()+25;}
  if(in>=0)close(in);int status=yt_reap(pid);fprintf(stderr,"YouTube packet-copy exit=%d signal=%d started=%d\n",status>=0&&WIFEXITED(status)?WEXITSTATUS(status):-1,status>=0&&WIFSIGNALED(status)?WTERMSIG(status):0,started);if(status<0||!WIFEXITED(status)||WEXITSTATUS(status))rc=1;
  if(started||attempt||!yt_active(token))break;
  /* Signed CDN URLs are ephemeral: one fresh resolution before any TS bytes. */
@@ -56,7 +66,7 @@ static void yt_stream(int fd,const char *path,const char *method){if(strcmp(meth
  snprintf(video,sizeof video,"%s",vu);snprintf(audio,sizeof audio,"%s",au);jfree(v);free(fresh.p);
  in=-1;pid=yt_spawn(&in,"",video,audio,1);rc=pid<0;until=mono_now()+25;
  }
-  if(started&&!rc){state_lock();double end=(S->yt_claim_at>0?S->yt_claim_at:S->play_started)+YT_STARTUP_GRACE+S->yt_duration+YT_DRAIN_GRACE;state_unlock();while(yt_active(token)&&mono_now()<end)nap(0.1);}
+  if(started&&!rc){state_lock();double end=(S->yt_claim_at>0?S->yt_claim_at:S->play_started)+YT_STARTUP_GRACE+S->yt_duration+YT_DRAIN_GRACE;state_unlock();double drain_end=mono_now()+YT_STARTUP_GRACE+YT_DRAIN_GRACE;if(end<drain_end)end=drain_end;shutdown(fd,SHUT_WR);while(yt_active(token)&&mono_now()<end)nap(0.1);}
  state_lock();int owned=S->yt_active&&!strcmp(S->yt_token,token);if(owned){snprintf(S->yt_error,sizeof S->yt_error,"%s",!started||rc?"HTTPS or remux failure":"Playback ended");playback_end_locked();}state_unlock();if(owned){if(!started)send_json_error(fd,502,"HTTPS or remux failure",method);
 #ifndef REBOX_YOUTUBE_MODULE
 receiver_stop();schedule_tv_return(1,POST_STOP_DISMISS);

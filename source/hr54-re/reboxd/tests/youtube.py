@@ -66,6 +66,33 @@ else:print(json.dumps({'videoUrl':'https://cdn.example/video?signature=private-t
         with urllib.request.urlopen(request) as response:self.assertFalse(json.load(response)['fields'][0]['value'])
         self.stop();self.start();self.assertFalse(self.get(path)['fields'][0]['value'])
 
+    def test_slow_decoder_backpressure_preserves_stream(self):
+        size=8*1024*1024
+        worker=self.data/'youtube/bin/relay.worker'
+        worker.write_text('import os\nos.write(1,b"G"+b"x"*'+str(size-1)+')\n')
+        self.get(self.prefix+'/play',{'itemId':'jNQXAC9IVRw'})
+        token=self.get(self.prefix+'/status')['playback']['session']
+        stream=urllib.request.urlopen(self.url+'/module-stream/youtube/'+token+'.ts',timeout=10)
+        self.addCleanup(stream.close);self.assertEqual(stream.read(188)[0],0x47)
+        time.sleep(6)
+        self.assertEqual(len(stream.read()),size-188)
+        self.assertTrue(self.get('/api/state')['playing'])
+        self.get('/api/playback/stop',{})
+
+    def test_late_eof_keeps_decoder_drain_and_remains_cancellable(self):
+        # Delivery ends after the old duration-based deadline has expired.
+        worker=self.data/'youtube/bin/relay.worker'
+        worker.write_text('import os,time\nos.write(1,b"G"+b"x"*187)\ntime.sleep(21)\n')
+        self.get(self.prefix+'/play',{'itemId':'jNQXAC9IVRw'})
+        token=self.get(self.prefix+'/status')['playback']['session']
+        stream=urllib.request.urlopen(self.url+'/module-stream/youtube/'+token+'.ts',timeout=30)
+        self.addCleanup(stream.close);self.assertEqual(stream.read(188)[0],0x47)
+        self.assertEqual(stream.read(1),b'')
+        self.assertTrue(self.get(self.prefix+'/status')['playback']['playing'])
+        self.assertTrue(self.get('/api/state')['playing'])
+        before=time.monotonic();self.get('/api/playback/stop',{})
+        self.assertLess(time.monotonic()-before,1.5);self.assertFalse(self.get('/api/state')['playing'])
+
     def test_missing_resolver_does_not_break_readiness(self):
         self.stop();(self.data/'youtube/resolver.pyc').unlink();self.start();self.assertTrue(self.get('/api/modules')['modules'][0]['healthy']);self.assertTrue(self.get('/api/system/status')['ready'])
         with self.assertRaises(urllib.error.HTTPError) as error:self.get(self.prefix+'/search?q=test')

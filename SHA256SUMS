@@ -1,5 +1,5 @@
 3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986  ./LICENSE
-2dd35a5ec68dd6b031d0cc84d9eddf5d9775a401527fd3d1880b3ecd9799a203  ./README.md
+bb77de5cd5ceed3b7a30469dfebfd6c9e6fb7867ee999e0e8b54633be3c53f45  ./README.md
 d41c7684fecafd696fb07acb8e6122cf2719aec59a2535fe35209b2494d3cf81  ./android/ReBox-controller.apk
 5765811b393a76fe280a747067ae41575881f9864c51fc0fce43d737e3c772e1  ./docs/ACCEPTANCE.md
 cae4c92b72c5785216e86d58c8d9521f1b3769ab453acdec733c6b543bf83c71  ./docs/ANDROID.md
@@ -12,6 +12,7 @@ cea32d6557031047624ca94305390fb3aa285874a2178ea646b94efe5143d1f6  ./docs/ROLLBAC
 6f20f76b3036f314b26d0f7697e934fd36f8146917d743fa1dd5a0ea6ef4ffba  ./docs/SECURITY.md
 c72c3c6dc54893575454910e21780efac73b6267e5a0831e070f2e7531e2579c  ./docs/STOCK-INSTALL.md
 492a78ba5911b41420dcdc46a386b721e17e52f383a9c1b240f2dfc25bafdb1b  ./docs/VALIDATION.md
+a71115071a00267cf4b7e4388e8e9ba43205acd074cafc6d59750ac3c57a0933  ./docs/YOUTUBE-PLAYBACK-20261008.md
 1d6791ed5eb800c3248ac7bdbfef85428eedddc5da14921553a919b8ef041513  ./docs/licenses/Debian-Linux-copyright.txt
 e501c9ca023176fc660838718c25b9c98d0bac532b1e59285724f34ab3e0b022  ./docs/rebox-home-preview.png
 fbb4264d73a331d40858d1965b2f483235d685deba538e3737c7eb7a8ba4da6b  ./docs/rebox-mascot.png
@@ -79,7 +80,10 @@ a7e2399e62bf5df4690a7527b4042a0471165677d5ebbc14a8457b55d6d4f06f  ./receiver/pay
 8882834b37ddfbc2bad5270195e54edca08c85d266f4e4d0ec556f277329961b  ./receiver/payload/hr54-persist/payload.md5
 a18f5f67edb8270375b84d5dbd576f5ae93529629fa3042e2d8b81e2517f8bed  ./receiver/payload/hr54-persist/rebox-start.sh
 82a478228f81e8f72068edba78e87dbc9b5eea96d28c82cedb7195ffe158b629  ./receiver/payload/hr54-persist/stock-firmware.md5
+1ef5b2809c540e00f34f55d66ad3a468d09513a122c79a96f447ea6b13609ef3  ./receiver/runtime/bin/reboxd
 74574217d060a22048cfb9e823f6cf42394699f7b8837af126d1296bde4fd6f1  ./receiver/runtime/hr54-ui
+06954be273197d13c4f482a79eea8b9868716c41e58f7fe479c88bd9dc2bb91b  ./receiver/runtime/modules/youtube/bin/module
+f64b29406a0b0fadcf09026ae2c1245f08f5b23fe817f4b4f851a660f8e0f5b8  ./receiver/runtime/modules/youtube/bin/relay
 d2ee89b51adb7dd2306c3539a1609af4808b82208a20d39389c762404ae50738  ./source/android/.gitignore
 49b39778878ab31ea80e15ea7fbe06ec72f9666b9a3b960781db58f7c1a54344  ./source/android/README.md
 ca89e89b616c2fea29681f38ccc36593ce414838b008ea88cd4468ac1ae66b18  ./source/android/app/build.gradle.kts
@@ -1687,15 +1691,15 @@ cbdf645685b3aea5a2bd4c08aee302bae8691230397efe2976253aaa1617b865  ./source/hr54-
 3ed240aff880bf51379f3685d0ac5aac8d671d52392c600a4cfeca20c836896c  ./source/hr54-re/modules/test-module/main.c
 ec2ee2e0027621516c278c0788f08fd868a56efad36dd66d62381e6333b54eb6  ./source/hr54-re/modules/test-module/module.json
 c7cd0fc55d4b88bc4ed87b1cdc33670d9046174ab762188a0f2ce10290bb56e0  ./source/hr54-re/modules/youtube/.gitignore
-68562693b6231a1231da74317d1ff15a551d87f20f35d2628e76140d029772a5  ./source/hr54-re/modules/youtube/build-receiver.sh
+268a42fe495205bd8ff17ca84f412551384dbd1f6bd6221d5c34dcbb2bb95779  ./source/hr54-re/modules/youtube/build-receiver.sh
 ca0cdc2df3da8c1b8be9a7cbd068175f0fedf6a0f18252f75aa3d44690368f51  ./source/hr54-re/modules/youtube/main.c
 9205152f0b1b8450e35fe25feb017dccc9381a70f0af8de9cd45d0fb598ae3a8  ./source/hr54-re/modules/youtube/module.json
-990d2baa2cb88ff8caa17228334f676db157ee05b469d213a597aafe2dc9f9c2  ./source/hr54-re/modules/youtube/relay.c
+b7811f8a3f8c92797308436cc4feb8bcc5ba11dd0394cb2da3e5112c75da5cb1  ./source/hr54-re/modules/youtube/relay.c
 779bcaa15cc4804c357151ca9b5daa27283efba057fe1ef698882cf4b62a2fa4  ./source/hr54-re/modules/youtube/resolver.py
-573ed88698e8bfdc94208afcdb069e9ca98777ae6d961be0c0718acfd9e3965c  ./source/hr54-re/modules/youtube/runtime.inc
+71902578a802e71b9b5222b92fcbffb01f5faf9d02b62c9c39a63cc212c501a4  ./source/hr54-re/modules/youtube/runtime.inc
 a9182cef1ed7b0aa419a030fd0bc6d5cac35f318463b07ab7bb8b36f87f8d591  ./source/hr54-re/modules/youtube/updater.py
 0cf256cc9234b415f912f5b0e9f8c9364688466041611047cd3f599c35f4efa6  ./source/hr54-re/reboxd/.gitignore
-2d3139c807913f0be7d1d8c6a25bd40ad4a766b4a47d1452e352cd00a9c414ea  ./source/hr54-re/reboxd/Makefile
+3c8a876daf6748b12ba3b873bc04da554f741456f3829146ed438f0788bb6be8  ./source/hr54-re/reboxd/Makefile
 aaaa89cb8bd4698cbe9c36ba4ccfbb5b378990af11b5f15a8d13e364fc051e30  ./source/hr54-re/reboxd/build-receiver.sh
 0f440725fe8c7267d0b7ab8998147a4894a896f79415f295ae1a5e4a2a045548  ./source/hr54-re/reboxd/compat.c
 7941e235df8a81ee908ed8a49f7627537b44081672feb24e7ea2236dda58b846  ./source/hr54-re/reboxd/compat.h
@@ -1724,7 +1728,7 @@ c1806a0c36690fa6a78cb896a974aadcbc7b9d055349e7226e5076224c45edd8  ./source/hr54-
 8c99c1ab4cc772e2e0755d3c285e6f72d5c7686ce782bd11d74b4a00f9cdd7b1  ./source/hr54-re/reboxd/native_app.h
 216463e1381ae520d619035b925a946cb926c7ba6392249a91075caab68b784d  ./source/hr54-re/reboxd/package.c
 e102861b3f972dab4cbc9c0f0a4769bd37abc31a78ca38eb754d835c2daa30fc  ./source/hr54-re/reboxd/package.h
-7ddbe76f8611fb298546781130e79d30e5e95d39deb14a8f9f40681e621dbe79  ./source/hr54-re/reboxd/playback.c
+c80d85d61379befb6a64314e05263f0da28063fd3903b79c7309baf719a81974  ./source/hr54-re/reboxd/playback.c
 94d04b93c62be832f3e6bea6321bb5d9443a98b30fd7cd710340536112355f6a  ./source/hr54-re/reboxd/playback.h
 e3de6ec6f6ccde6b5487ae76912c3ceff1079c889f351b6572a67db31e0b8506  ./source/hr54-re/reboxd/rebox-start.sh
 68aa9c1e27e086f37120f76a89b0b85e1dc2cee04bb9b6620493db4a1d15f031  ./source/hr54-re/reboxd/system.c
@@ -1740,7 +1744,8 @@ d08dc9a77e0db11a4373e1beb2d74016f4bd24f3b5ce7079070aad74714cad77  ./source/hr54-
 4241f69717f6259aeb30dad525be8f615eb42d3f89c1f35dc55bf71ae6f7a3e1  ./source/hr54-re/reboxd/tests/runtime.py
 a201e161562dc16f178af64bc03f44d75241da148aad45ac91ddb6c7b0cbf257  ./source/hr54-re/reboxd/tests/seed.c
 3b0b3947d5755b4de814dea61facccb5c70ad948fddb95aff991a2fae605fda9  ./source/hr54-re/reboxd/tests/seed.py
-b6b42c32c73e16afac03161b38fac066677c00b7506c8ca332e11d4c6f601f67  ./source/hr54-re/reboxd/tests/youtube.py
+b0e996026ffeb61ea8f6e40136207ea0cccb74ab62af792eb78b3298d2830dfc  ./source/hr54-re/reboxd/tests/youtube.py
+e39262c723f7f8b5e4c842538237f0603db82da5e9756647fde0be9f68ae0cad  ./source/hr54-re/reboxd/tests/youtube_relay.py
 5fd531d44da36d2ca0ea46d89e49505c3aeb38c84b84c771e63a659099a8003e  ./source/hr54-re/tools/native-input/protocol.py
 f56a5a1da55ea024cc08d72c05e5d197ffcf658dc412d2573decbd02591f620d  ./source/hr54-re/tools/native-media/protocol.py
 309ef3d2c15a0c40b562f59bfc054db87342c55d6c926cc639112c5d8c12303f  ./source/hr54-re/tools/native-ui/.gitignore
@@ -1845,7 +1850,7 @@ e8559e6478803863aba6aba93944e7f1b749768462d5da76268b6de9176ff407  ./tools/recv/h
 f63bd7ce2009e009caa509bfb62e9e4399bb86f7c806512cfdbb24aae7438c17  ./tools/recv/legacy-runtime-entry.sh
 8e37d3e4507211d5c32386ece7e8e44025189f3cfc052c8777ac75a4c7a97bd3  ./tools/recv/runtime-activate.sh
 db2492cadef6d42cd0cf82ee5705ec320615bc79f22c2303aaca5040515d3f72  ./tools/recv/runtime-rollback.sh
-ed788e80d985b0010bba99cd88988cb529ab44909516be7aa40414da4dae4e8d  ./tools/rejoin-provider-runtime.sh
+5ab039d3ca5c9962db5abad282996ed0e70eb4567bfd7991c401ecebd096afc9  ./tools/rejoin-provider-runtime.sh
 17ae6c3206a80d9bf2574964dd945360b2bc1e089a82b64e34366d666a3a54a0  ./tools/test-install-lifecycle.py
 fd1deb28c01edd64d2efc2f8c83556a53dcf5ddddb838e5f478cb57eca4129a7  ./tools/tftp-get.py
 18b1f31f425f868e58575e27d73cf49654bc2dceac3bb34f8e16deb3794a6686  ./tools/update-receiver-branding.sh

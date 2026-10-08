@@ -10,5 +10,5 @@ mkdir -p "$here/build/bin"
   "$project/reboxd/module_auth.c" -pthread -lm
 file "$here/build/bin/module"
 "$youtube_zig" cc -target mips-linux-musleabi -mcpu=mips32 -static -O2 \
-  -o "$here/build/bin/relay" "$here/relay.c"
+  -o "$here/build/bin/relay" "$here/relay.c" -pthread
 file "$here/build/bin/relay"

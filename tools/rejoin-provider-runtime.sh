@@ -10,7 +10,7 @@ cp -p "$base/rebox-start.sh" "$work/previous/rebox-start.sh"
 cp -p "$menu/hr54-ui" "$work/previous/hr54-ui"
 (cd "$work/original"; tar -xf "$base/backup/restore-from-ReBox-20261007/before.tar" rebox-start.sh jellyfin/bin/hr54-jf)
 [ "$(md5sum "$work/original/jellyfin/bin/hr54-jf" | cut -d' ' -f1)" = 804613d0f5b41984d0b65f38397f3780 ]
-[ "$(md5sum "$base/rebox/bin/reboxd" | cut -d' ' -f1)" = 0ae19ef10716fd04cad1569ec1463835 ]
+[ "$(md5sum "$base/rebox/bin/reboxd" | cut -d' ' -f1)" = 816d3c5c740b339cba4ba7f3473974b1 ]
 [ "$(md5sum /var/hr54-transfer/rebox-prepare-ui-20261008 | cut -d' ' -f1)" = 52868f7a8d34fbe5b1b23bd5185c4ddd ]
 boot=$(cat /proc/sys/kernel/random/boot_id)
 policy=$(cat "$menu/policy.md5")

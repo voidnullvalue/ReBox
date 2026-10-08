@@ -175,6 +175,7 @@ Use a trusted or isolated LAN/VLAN. Do not port-forward these services to the In
 - [Playback investigation and fixes](docs/PLAYBACK-20261007.md)
 - [Package validation](docs/VALIDATION.md)
 - [ReBox artwork and smoke background](docs/BRANDING.md)
+- [YouTube buffering and playback drain](docs/YOUTUBE-PLAYBACK-20261008.md)
 
 ## current validation boundary
 
