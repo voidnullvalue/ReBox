@@ -87,5 +87,10 @@ int main(void){
     app_key(surf,(KeyEvent){KEY_CHANNEL_UP,1,0,0x1e006});assert(surf->screen==SCREEN_PLAYER&&surf->loading&&surf->channel_changing&&strstr(surf->api.r[API_OPERATION].request,"/api/playback/channelUp"));api_cancel(&surf->api,API_OPERATION);
     ApiResponse failure={API_PLAY,API_FAILED,surf->api.generation,502,NULL,0};app_response(surf,&failure);assert(!surf->awaiting&&surf->screen==SCREEN_PLAYER&&!surf->loading);
     app_key(surf,(KeyEvent){KEY_CHANNEL_DOWN,1,0,0x1e007});assert(strstr(surf->api.r[API_OPERATION].request,"/api/playback/channelDown"));api_cancel(&surf->api,API_OPERATION);app_key(surf,(KeyEvent){KEY_MENU,1,0,0});app_response(surf,&failure);assert(surf->screen==SCREEN_HOME&&!surf->channel_changing);app_free(surf);free(surf);
+    App *diagnostic=calloc(1,sizeof *diagnostic);assert(diagnostic);app_init(diagnostic,1);diagnostic->screen=SCREEN_PLAYER;ui_copy(diagnostic->operation_module,sizeof diagnostic->operation_module,"iptv");
+    ApiResponse failed_play={API_PLAY,API_FAILED,diagnostic->api.generation,502,(const unsigned char *)"{\"error\":\"playback preparation failed\"}",47};failed_play.length=strlen((const char *)failed_play.bytes);app_response(diagnostic,&failed_play);
+    assert(diagnostic->screen==SCREEN_ERROR&&strstr(diagnostic->api.r[API_BROWSE].request,"GET /api/modules/iptv/status "));api_cancel(&diagnostic->api,API_BROWSE);
+    reply(diagnostic,API_PLAY_DIAGNOSTIC,"{\"error\":\"Channel unavailable (HTTP 404)\"}");assert(!strcmp(diagnostic->message,"Channel unavailable (HTTP 404)"));
+    reply(diagnostic,API_PLAY_DIAGNOSTIC,"{\"error\":\"https://provider.example/?token=secret\"}");assert(!strcmp(diagnostic->message,"Channel unavailable (HTTP 404)"));app_free(diagnostic);free(diagnostic);
     app_free(app);free(app);return 0;
 }

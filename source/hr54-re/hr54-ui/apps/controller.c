@@ -8,6 +8,16 @@ const MediaItem *app_selected(App *a){BrowseNode *n=app_node(a);return n->select
 void app_art_key(char *out,size_t cap,const char *module,const char *art){snprintf(out,cap,"%s:%s:%s",art&&*art?"media":"icon",module,art?art:"");}
 static void screen(App *a,Screen s){a->previous=a->screen;a->screen=s;a->visible=s!=SCREEN_HIDDEN&&s!=SCREEN_NATIVE_APP;a->dirty=1;}
 static void notice(App *a,const char *text){ui_copy(a->notice,sizeof a->notice,text);a->notice_until=ui_now()+3500;a->dirty=1;}
+static void play_diagnostic(App *a){
+    if(!api_module_id(a->operation_module))return;
+    char path[128];snprintf(path,sizeof path,"/api/modules/%s/status",a->operation_module);
+    api_send(&a->api,API_BROWSE,API_PLAY_DIAGNOSTIC,"GET",path,NULL,5000);
+}
+static int diagnostic_safe(const char *message){
+    size_t n=strlen(message);if(!n||n>180||strstr(message,"://")||strchr(message,'?')||strchr(message,'@')||strchr(message,'%')||strchr(message,'\\'))return 0;
+    for(size_t i=0;i<n;i++)if((unsigned char)message[i]<32||(unsigned char)message[i]>126)return 0;
+    return 1;
+}
 static void invalidate(App *a){++a->api.generation;api_cancel(&a->api,API_BROWSE);api_cancel(&a->api,API_ARTWORK);a->artwork.pending[0]=0;a->loading=0;}
 void app_init(App *a,int port){memset(a,0,sizeof *a);api_init(&a->api,port);a->screen=SCREEN_STARTUP;a->return_screen=SCREEN_HOME;a->visible=a->dirty=1;ui_copy(a->message,sizeof a->message,"Starting display");}
 void app_free(App *a){api_close(&a->api);artwork_free(&a->artwork);}
@@ -96,8 +106,18 @@ void app_key(void *ctx,KeyEvent ev){App *a=ctx;if(!ev.pressed)return;
 }
 void app_response(void *ctx,const ApiResponse *r){App *a=ctx;
     if(r->kind==API_IMAGE){if(r->generation==a->api.generation&&artwork_queue(&a->artwork,r->bytes,r->length,r->error==API_OK,r->generation)){artwork_accept(&a->artwork,NULL,0,0);a->dirty=1;}return;}
-    int browse=r->kind==API_MODULES||r->kind==API_MEDIA||r->kind==API_MODULE_STATUS||r->kind==API_MODULE_SETTINGS||r->kind==API_MODULE_ACTION||r->kind==API_MANAGEMENT_PAIR;
+    int browse=r->kind==API_MODULES||r->kind==API_MEDIA||r->kind==API_MODULE_STATUS||r->kind==API_MODULE_SETTINGS||r->kind==API_MODULE_ACTION||r->kind==API_MANAGEMENT_PAIR||r->kind==API_PLAY_DIAGNOSTIC;
     if(browse&&r->generation!=a->api.generation)return;
+    if(r->kind==API_PLAY_DIAGNOSTIC){
+        if(r->error==API_OK&&(a->screen==SCREEN_ERROR||a->screen==SCREEN_PLAYER)){
+            Json j;char message[256];if(!json_open(&j,(const char *)r->bytes,r->length)){
+                if(!json_string(&j,json_field(&j,0,"error"),message,sizeof message)&&diagnostic_safe(message)){
+                    if(a->screen==SCREEN_ERROR){ui_copy(a->message,sizeof a->message,message);a->dirty=1;}
+                    else notice(a,message);
+                }json_close(&j);
+            }
+        }return;
+    }
     ApiError error=r->error;OperationResult operation={0};PlaybackState playback={0};ModuleList *modules=NULL;
     if(error==API_OK){int rc=0;
         if(r->kind==API_MODULES){modules=calloc(1,sizeof *modules);rc=modules?api_parse_modules(r,modules):-1;}
@@ -107,7 +127,7 @@ void app_response(void *ctx,const ApiResponse *r){App *a=ctx;
         else rc=api_parse_operation(r,&operation);
         if(rc)error=API_MALFORMED;
     }
-    if(error!=API_OK){free(modules);if(r->kind==API_PLAY){a->awaiting=0;if(a->screen==SCREEN_HIDDEN||a->channel_changing){int show=a->channel_changing&&a->screen==SCREEN_PLAYER;a->channel_changing=0;a->loading=0;a->player_until=show?ui_now()+3500:0;if(show)screen(a,SCREEN_PLAYER);notice(a,api_error_message(error));a->next_status=0;return;}}
+    if(error!=API_OK){free(modules);if(r->kind==API_PLAY){a->awaiting=0;play_diagnostic(a);if(a->screen==SCREEN_HIDDEN||a->channel_changing){int show=a->channel_changing&&a->screen==SCREEN_PLAYER;a->channel_changing=0;a->loading=0;a->player_until=show?ui_now()+3500:0;if(show)screen(a,SCREEN_PLAYER);notice(a,api_error_message(error));a->next_status=0;return;}}
         if(*a->opening_module&&(r->kind==API_MODULE_OPEN||r->kind==API_STOP||r->kind==API_NATIVE_STOP)){opening_failed(a);return;}
         if(r->kind==API_STATE){if(a->status_failures<6)a->status_failures++;a->next_status=ui_now()+(uint64_t)(1<<a->status_failures)*1000;return;}
         if(r->kind==API_READY){a->next_status=ui_now()+2000;ui_copy(a->message,sizeof a->message,"Waiting for the receiver service");a->dirty=1;return;}

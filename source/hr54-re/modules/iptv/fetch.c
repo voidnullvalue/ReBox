@@ -12,6 +12,7 @@ extern int strncmp(const char *,const char *,size_t);
 extern long atol(const char *);
 extern int puts(const char *);
 extern int fprintf(void *,const char *,...);
+extern int snprintf(char *,size_t,const char *,...);
 extern void *stderr;
 typedef void CURL;
 extern CURL *curl_easy_init(void);
@@ -43,6 +44,11 @@ int main(int argc,char **argv){
  OPT(78,12L);OPT(13,atol(argv[5]));OPT(45,1L);OPT(19,1L);OPT(20,15L);OPT(99,1L);
  OPT(10018,*argv[3]?argv[3]:"HR54-IPTV/1");if(*argv[4])OPT(10016,argv[4]);
  int rc=curl_easy_perform(handle);long status=0;curl_easy_getinfo(handle,0x200002,&status);
+ if(!sent){char response[64];int n=0;
+  if(status>=300)n=snprintf(response,sizeof response,"!HTTP:%ld\n\n\n",status);
+  else if(rc)n=snprintf(response,sizeof response,"!CURL:%d\n\n\n",rc);
+  if(n>0&&(size_t)n<sizeof response)put(response,(size_t)n);
+ }
  if(rc||status<200||status>=300)fprintf(stderr,"Media fetch: curl=%d (%s) HTTP=%ld bodyStarted=%d\n",rc,curl_easy_strerror(rc),status,sent);
  curl_easy_cleanup(handle);return rc||status<200||status>=300?1:0;
 }

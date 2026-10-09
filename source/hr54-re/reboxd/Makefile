@@ -11,7 +11,7 @@ build/registry: tests/registry.c $(LIB) $(wildcard *.h)
 build/reboxd: main.c http.c $(RUNTIME) $(LIB) $(wildcard *.h)
 	mkdir -p build
 	$(CC) $(CFLAGS) -I. -o $@ main.c http.c $(RUNTIME) $(LIB) -lm -pthread
-test: all build/test-seed build/jellyfin-module build/iptv-module build/iptv-fetch build/youtube-module build/frigate-module build/frigate-relay build/doom-module build/radio-module build/radio-audio
+test: all build/test-seed build/jellyfin-module build/iptv-module build/iptv-fetch build/iptv-remux build/youtube-module build/frigate-module build/frigate-relay build/doom-module build/radio-module build/radio-audio
 	python3 tests/foundation.py
 	python3 tests/seed.py
 	python3 tests/runtime.py
@@ -53,6 +53,10 @@ build/iptv-module: ../modules/iptv/main.c ../modules/iptv/library.inc ../modules
 build/iptv-fetch: ../modules/iptv/fetch.c
 	mkdir -p build
 	$(CC) $(CFLAGS) -o $@ $< -lcurl
+
+build/iptv-remux: ../modules/iptv/remux.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $< $$(pkg-config --cflags --libs libavformat libavcodec libavutil)
 
 build/youtube-module: ../modules/youtube/main.c ../modules/youtube/runtime.inc ../modules/shared/sdk.c http.c json.c files.c module_auth.c
 	mkdir -p build

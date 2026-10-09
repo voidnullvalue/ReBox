@@ -452,6 +452,10 @@ libavcodec libavutil`) plus `ffmpeg`/`ffprobe` for a real fMP4 fixture.
 
 See [the playback investigation and receiver evidence](PLAYBACK-20261007.md).
 
+The October 8 IPTV transport update, bounded playlist scan, packet-copy fMP4
+worker, split-PMT handling, retry limits, and remaining format boundaries are
+documented in [IPTV-COMPATIBILITY-20261008.md](IPTV-COMPATIBILITY-20261008.md).
+
 ## Live channel transport
 
 Providers can advertise `transport.channelUp` and `channelDown` in a stream

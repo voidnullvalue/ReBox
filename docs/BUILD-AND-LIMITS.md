@@ -116,8 +116,11 @@ notices are retained; vendor redistribution rights are not asserted.
 - Native output reported 720x480 after warm boot versus 1920x1080 during final
   live acceptance. Full-width layout adapts to the vendor output; this is not
   a promise of persistent 1080p output on a stock boot. Inspect HDMI mode.
-- IPTV needs a user playlist and compatible H.264/AAC/AC3 transport streams;
-  arbitrary DASH/DRM or unsupported codecs are not converted by this shell.
+- IPTV needs a user playlist and receiver-compatible H.264/AAC/AC-3 media.
+  MPEG-TS can pass through, and unencrypted H.264/AAC or H.264/AC-3 fMP4 HLS
+  with in-band audio can be packet-copied to MPEG-TS. Separate HLS audio
+  renditions, byte-range HLS, arbitrary DASH/DRM, and unsupported codecs are
+  not converted by this shell; see `docs/IPTV-COMPATIBILITY-20261008.md`.
 - YouTube online extraction can change. This is the known working snapshot,
   not a promise that all current/private/age-gated videos work. No cookies or
   external PC resolver supplied; public anonymous path is the intended default.

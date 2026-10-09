@@ -51,7 +51,7 @@ static int prepare(struct jval *body,struct sb *out){
     char token[33],selected[IPTV_URL_CAP+1];if(rb_random(token,32))return -1;
     rb_media_origin("IPTV playlist entry",c->url);
     state_lock();playback_end_locked();strcpy(S->iptv_token,token);S->iptv_active=1;S->iptv_error[0]=0;state_unlock();
-    if(iptv_probe(c,selected,token)){state_lock();if(!strcmp(S->iptv_token,token))playback_end_locked();state_unlock();return -1;}
+    if(iptv_probe(c,selected,token)){state_lock();if(!strcmp(S->iptv_token,token)){snprintf(S->iptv_error,sizeof S->iptv_error,"%s",g_err);playback_end_locked();}state_unlock();return -1;}
     rb_media_origin("IPTV selected stream",selected);
     state_lock();if(!S->iptv_active||strcmp(S->iptv_token,token)){state_unlock();return fail("IPTV preparation cancelled");}
     snprintf(S->iptv_url,sizeof S->iptv_url,"%s",selected);snprintf(S->iptv_ua,sizeof S->iptv_ua,"%s",c->ua);snprintf(S->iptv_ref,sizeof S->iptv_ref,"%s",c->ref);state_unlock();
@@ -72,7 +72,8 @@ static int adjacent(struct jval *body,struct sb *out){
  if(!strcmp(surf_anchor,id)&&*surf_cursor){for(size_t i=0;i<iptv_count;i++)if(!strcmp(surf_cursor,iptv_channels[i].id)){at=i;break;}}
  size_t next=direction>0?(at+1)%iptv_count:(at+iptv_count-1)%iptv_count;
  snprintf(surf_anchor,sizeof surf_anchor,"%s",id);snprintf(surf_cursor,sizeof surf_cursor,"%s",iptv_channels[next].id);
- char token[33],selected[IPTV_URL_CAP+1];state_lock();snprintf(token,sizeof token,"%s",S->iptv_token);state_unlock();if(iptv_probe(&iptv_channels[next],selected,token))return -1;
+ char token[33],selected[IPTV_URL_CAP+1];state_lock();snprintf(token,sizeof token,"%s",S->iptv_token);state_unlock();if(iptv_probe(&iptv_channels[next],selected,token)){state_lock();snprintf(S->iptv_error,sizeof S->iptv_error,"%s",g_err);state_unlock();return -1;}
+ state_lock();S->iptv_error[0]=0;state_unlock();
  sb_puts(out,"{\"ok\":true,\"itemId\":");sb_json_str(out,iptv_channels[next].id);sb_puts(out,"}");return 0;
 }
 static void handle(int fd,const RbRequest *request){
@@ -97,6 +98,7 @@ released:jfree(body);free(out.p);pthread_mutex_unlock(&operation_mutex);
 }
 static void *clock_start(void *unused){(void)unused;iptv_clock_bootstrap();return NULL;}
 int main(int argc,char **argv){(void)argc;persist_root=getenv("REBOX_MODULE_DATA");if(!persist_root)return 2;
+    signal(SIGPIPE,SIG_IGN);
 #ifndef REBOX_HOST_TEST
     struct stat legacy;if(!lstat("/var/hr54-persist/jellyfin/iptv",&legacy)&&S_ISDIR(legacy.st_mode)&&legacy.st_uid==geteuid())persist_root="/var/hr54-persist/jellyfin";
 #endif

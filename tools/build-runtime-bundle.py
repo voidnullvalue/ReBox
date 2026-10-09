@@ -64,6 +64,7 @@ def main():
             copy(SRC / 'modules/radio/default-data', package / 'default-data')
         elif identity == 'iptv':
             copy(SRC / 'modules/iptv/build/bin/fetch', package / 'bin/fetch', True)
+            copy(SRC / 'modules/iptv/build/bin/remux', package / 'bin/remux', True)
             copy(PAYLOAD / 'jellyfin/iptv', package / 'default-data/iptv')
         elif identity == 'youtube':
             default = package / 'default-data/youtube'

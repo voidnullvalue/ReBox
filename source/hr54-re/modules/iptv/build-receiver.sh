@@ -16,3 +16,16 @@ file "$here/build/bin/module"
   -Wl,--allow-shlib-undefined -o "$here/build/bin/fetch" "$here/fetch.c" \
   "$iptv_sysroot/usr/lib/libcurl.so.4.4.0" "$iptv_sysroot/lib/libc.so.0"
 file "$here/build/bin/fetch"
+iptv_ffmpeg=${HR54_FFMPEG_BUILD:-$here/build/ffmpeg-8.0}
+if [ ! -f "$iptv_ffmpeg/configure" ]; then
+  tar -xf "$project/../dependencies/ffmpeg-8.0.tar.xz" -C "$here/build"
+fi
+if [ ! -f "$iptv_ffmpeg/libavformat/libavformat.a" ]; then
+  (cd "$iptv_ffmpeg"; sh "$here/build-remux.sh")
+fi
+"$iptv_zig" cc -target mips-linux-musleabi -mcpu=mips32 -static -O2 -s \
+  -I"$iptv_ffmpeg" -o "$here/build/bin/remux" "$here/remux.c" \
+  "$iptv_ffmpeg/libavformat/libavformat.a" \
+  "$iptv_ffmpeg/libavcodec/libavcodec.a" \
+  "$iptv_ffmpeg/libavutil/libavutil.a" -lm
+file "$here/build/bin/remux"
