@@ -11,6 +11,25 @@ menu=$base/native-menu
 mkdir -p "$runtime/log" /var/opt/hr54/bin
 cp "$base/bin/hr54-play-url" /var/opt/hr54/bin/hr54-play-url
 chmod 700 /var/opt/hr54/bin/hr54-play-url
+# Additive, generic optional module boot hooks. Each regular executable directly
+# under the trusted persistent boot.d directory is spawned in the background and
+# fully fail-isolated, so a missing, slow or broken hook can never gate or crash
+# core boot. This runs after the ReBox marker is confirmed and before the core
+# binds its modules, and never blocks long tasks.
+bootd=$runtime/boot.d
+if [ -d "$bootd" ] && [ ! -L "$bootd" ]; then
+    for hook in "$bootd"/*.sh; do
+        [ -f "$hook" ] && [ ! -L "$hook" ] && [ -x "$hook" ] || continue
+        (
+            trap '' HUP
+            if "$hook"; then
+                echo "boot hook $(basename "$hook") ok"
+            else
+                echo "boot hook $(basename "$hook") failed rc=$?"
+            fi
+        ) >> "$runtime/log/boot-hook-$(basename "$hook" .sh).log" 2>&1 < /dev/null &
+    done
+fi
 pid=$(cat "$runtime/reboxd.pid" 2>/dev/null || :)
 running=false
 case "$pid" in ''|*[!0-9]*) :;; *)

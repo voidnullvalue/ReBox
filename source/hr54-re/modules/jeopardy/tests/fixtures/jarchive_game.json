@@ -1,0 +1,58 @@
+{
+  "air_date": "2020-05-05",
+  "game_id": 9001,
+  "rounds": [
+    {
+      "round": "Jeopardy!",
+      "categories": [
+        {
+          "category": "TEST CAT ONE",
+          "clues": [
+            {"clue": "alpha one", "correct_response": "A1", "value": 200},
+            {"clue": "alpha two", "correct_response": "A2", "value": 400},
+            {"clue": "alpha three", "correct_response": "A3", "value": 600},
+            {"clue": "alpha four", "correct_response": "A4", "value": 800},
+            {"clue": "alpha five", "correct_response": "A5", "value": 1000},
+            {"clue": "alpha six <a href='media'>shown here</a>", "correct_response": "A6", "value": 200},
+            {"clue": "alpha one", "correct_response": "A1", "value": 200},
+            {"clue": "alpha seven", "correct_response": "", "value": 200}
+          ]
+        },
+        {
+          "category": "TEST CAT TWO",
+          "clues": [
+            {"clue": "beta one", "correct_response": "B1", "value": 200},
+            {"clue": "beta two", "correct_response": "B2", "value": 400},
+            {"clue": "beta three", "correct_response": "B3", "value": 600}
+          ]
+        }
+      ]
+    },
+    {
+      "round": "Double Jeopardy!",
+      "categories": [
+        {
+          "category": "TEST CAT DJ",
+          "clues": [
+            {"clue": "gamma one", "correct_response": "C1", "value": 400},
+            {"clue": "gamma two", "correct_response": "C2", "value": 800},
+            {"clue": "gamma three", "correct_response": "C3", "value": 1200},
+            {"clue": "gamma four", "correct_response": "C4", "value": 1600},
+            {"clue": "gamma five", "correct_response": "C5", "value": 2000, "daily_double": true}
+          ]
+        }
+      ]
+    },
+    {
+      "round": "Final Jeopardy!",
+      "categories": [
+        {
+          "category": "TEST FINAL",
+          "clues": [
+            {"clue": "delta final", "correct_response": "D1"}
+          ]
+        }
+      ]
+    }
+  ]
+}

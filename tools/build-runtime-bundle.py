@@ -16,7 +16,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / 'source/hr54-re'
 PAYLOAD = ROOT / 'receiver/payload/hr54-persist'
-PROVIDERS = ('jellyfin', 'iptv', 'youtube', 'frigate', 'radio', 'doom')
+PROVIDERS = ('jellyfin', 'iptv', 'youtube', 'frigate', 'radio', 'doom', 'jeopardy')
 spec = importlib.util.spec_from_file_location('package_builder', ROOT / 'tools/build-module.py')
 builder = importlib.util.module_from_spec(spec); spec.loader.exec_module(builder)
 
@@ -39,9 +39,13 @@ def main():
     env = {**os.environ, 'HR54_SYSROOT': str(args.sysroot.resolve()), 'ZIG_GLOBAL_CACHE_DIR': '/tmp/rebox-zig-cache', 'ZIG_LOCAL_CACHE_DIR': '/tmp/rebox-zig-local'}
     def run(command): subprocess.run(command, cwd=ROOT, env=env, check=True)
     run(['sh', str(SRC / 'reboxd/build-receiver.sh')])
-    for identity in PROVIDERS: run(['sh', str(SRC / 'modules' / identity / 'build-receiver.sh')])
-    # Native UI uses the existing extracted graphics ABI; its firmware is checked at deployment.
-    ui_env = {**env, 'HR54_SYSROOT': str(SRC / 'extracted/sdb4-rootfs')}
+    # Native-app modules (and the vendor UI) use the extracted graphics ABI; its
+    # firmware is checked at deployment.
+    graphics_env = {**env, 'HR54_SYSROOT': str(SRC / 'extracted/sdb4-rootfs')}
+    for identity in PROVIDERS:
+        subprocess.run(['sh', str(SRC / 'modules' / identity / 'build-receiver.sh')], cwd=ROOT,
+                       env=graphics_env if identity == 'jeopardy' else env, check=True)
+    ui_env = graphics_env
     subprocess.run(['sh', str(SRC / 'hr54-ui/tools/build-receiver.sh')], cwd=ROOT, env=ui_env, check=True, stdout=subprocess.DEVNULL)
     out.mkdir(parents=True); out.chmod(0o700)
     runtime = out / 'rebox'; runtime.mkdir(); runtime.chmod(0o700)
@@ -54,7 +58,7 @@ def main():
         package = runtime / 'modules' / identity
         copy(SRC / 'modules' / identity / 'module.json', package / 'module.json')
         copy(SRC / 'modules' / identity / 'build/bin/module', package / 'bin/module', True)
-        copy(SRC / 'modules/radio/assets/radio.png' if identity == 'radio' else SRC / 'hr54-ui/assets/icons' / (identity + '.png'), package / 'icon.png')
+        copy(SRC / 'modules/radio/assets/radio.png' if identity == 'radio' else SRC / 'modules/jeopardy/assets/icon.png' if identity == 'jeopardy' else SRC / 'hr54-ui/assets/icons' / (identity + '.png'), package / 'icon.png')
         manifest = json.loads((package / 'module.json').read_text()); manifest['icon'] = 'icon.png'
         (package / 'module.json').write_text(json.dumps(manifest, separators=(',', ':')) + '\n')
         if identity == 'radio':
@@ -82,6 +86,10 @@ def main():
             copy(PAYLOAD / 'jellyfin/doom/bin/hr54-doom-native', package / 'bin/hr54-doom-native', True)
             copy(PAYLOAD / 'jellyfin/doom/data', package / 'default-data/doom/data')
             copy(PAYLOAD / 'jellyfin/doom/LICENSE.txt', package / 'LICENSE.txt')
+        elif identity == 'jeopardy':
+            copy(SRC / 'modules/jeopardy/build/bin/hr54-jeopardy-native', package / 'bin/hr54-jeopardy-native', True)
+            copy(SRC / 'modules/jeopardy/build/demo.jdb', package / 'default-data/questions.jdb')
+            copy(SRC / 'modules/jeopardy/assets/OFL.txt', package / 'OFL.txt')
         elif identity == 'frigate':
             copy(SRC / 'modules/frigate/build/bin/relay', package / 'bin/relay', True)
         filename = identity + '.rbox'

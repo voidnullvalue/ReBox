@@ -59,6 +59,7 @@ The current bundled **core modules** are:
 - YouTube
 - Frigate
 - Doom
+- Jeopardy! (native module: authoritative engine, LAN service and native TV show)
 
 Core modules are trusted packages shipped with ReBox. They are discovered at runtime and can be enabled or disabled through the same module-management path used by other modules. Missing bundled modules can be restored from the receiver's trusted offline catalog.
 
@@ -153,7 +154,7 @@ Use a trusted or isolated LAN/VLAN. Do not port-forward these services to the In
 | --- | --- |
 | `android/ReBox-controller.apk` | Current Android controller APK |
 | `receiver/payload/hr54-persist/` | Receiver payload, native UI, input broker, API/backend and media runtime assets |
-| `source/hr54-re/modules/` | Jellyfin, IPTV, Internet Radio, YouTube, Frigate, Doom, shared module support and test module source |
+| `source/hr54-re/modules/` | Jellyfin, IPTV, Internet Radio, YouTube, Frigate, Doom, Jeopardy, shared module support and test module source |
 | `source/hr54-re/reboxd/` | ReBox core daemon, module registry/manager, playback arbitration and management API |
 | `source/hr54-re/hr54-ui/` | Generic receiver-native UI driven by runtime module descriptors |
 | `stock-bootstrap/` | Stock asset-7 boot hook, genuine anchor and big-endian MIPS helper environment |
@@ -169,6 +170,7 @@ Use a trusted or isolated LAN/VLAN. Do not port-forward these services to the In
 ## docs worth reading
 
 - [Module architecture and API](docs/MODULES.md)
+- [Jeopardy module, controls, import and limits](source/hr54-re/modules/jeopardy/README.md)
 - [Stock installation](docs/STOCK-INSTALL.md)
 - [Security and privacy](docs/SECURITY.md)
 - [Rollback](docs/ROLLBACK.md)
@@ -187,6 +189,17 @@ The runtime-module build has been physically exercised on the development HR54-7
 That does not mean every path has been re-tested after every change. Cold boot behavior, every remote code, every possible upstream media format and every other HR54 firmware revision are not magically proven because one box works.
 
 The portable stock packaging and installer have passed offline checks against a cloned stock image. They still need acceptance on another physical stock receiver.
+
+Jeopardy! builds on the same verified native-app path. Its rules core, LAN
+service, native renderer stack, default seeding and `.rbox` package are all
+host-verified, and the module is now installed and healthy on the development
+HR54-700: the uClibc/EGL renderer created a physical EGL surface and a
+two-player LAN smoke test passed end to end. Receiver-side TV sound effects are
+currently unsupported (there is no verified native audio-injection interface —
+see the module guide); phone audio works offline. Reboot persistence is
+delivered by the generic launcher boot hook and a deterministic fresh-boot
+simulation; the persisted rule survives boot, though no physical reboot was
+performed.
 
 That is why the badge at the top says **EARLY ALPHA**.
 

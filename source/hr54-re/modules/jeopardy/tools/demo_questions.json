@@ -1,0 +1,257 @@
+{
+  "schema": 1,
+  "id": "rebox-original-demo",
+  "title": "ReBox Original Demo Pack",
+  "airdate": "2026-01-01",
+  "jeopardy": [
+    {
+      "category": "WORLD CAPITALS",
+      "clues": [
+        {"value": 200, "clue": "This city on the Seine is the capital of France", "response": "Paris"},
+        {"value": 400, "clue": "The capital of Japan, formerly called Edo", "response": "Tokyo"},
+        {"value": 600, "clue": "This Canadian capital sits on a river of the same name", "response": "Ottawa"},
+        {"value": 800, "clue": "The capital of Australia, chosen as a compromise between Sydney and Melbourne", "response": "Canberra"},
+        {"value": 1000, "clue": "This landlocked country's capital is Ulaanbaatar", "response": "Mongolia"}
+      ]
+    },
+    {
+      "category": "ELEMENT SYMBOLS",
+      "clues": [
+        {"value": 200, "clue": "The symbol Fe stands for this metal", "response": "iron"},
+        {"value": 400, "clue": "The symbol Au represents this precious metal", "response": "gold"},
+        {"value": 600, "clue": "This element with symbol Na is half of table salt", "response": "sodium"},
+        {"value": 800, "clue": "The symbol Pb stands for this metal once used in pipes", "response": "lead"},
+        {"value": 1000, "clue": "This element with symbol W is used in light bulb filaments", "response": "tungsten"}
+      ]
+    },
+    {
+      "category": "PLANET FACTS",
+      "clues": [
+        {"value": 200, "clue": "The closest planet to the Sun", "response": "Mercury"},
+        {"value": 400, "clue": "The planet known as the Red Planet", "response": "Mars"},
+        {"value": 600, "clue": "The largest planet in our solar system", "response": "Jupiter"},
+        {"value": 800, "clue": "This planet's Great Dark Spot was observed by Voyager 2", "response": "Neptune"},
+        {"value": 1000, "clue": "The planet that rotates on its side, tilted about 98 degrees", "response": "Uranus"}
+      ]
+    },
+    {
+      "category": "CLASSIC LITERATURE",
+      "clues": [
+        {"value": 200, "clue": "This Dickens novel begins It was the best of times, it was the worst of times", "response": "A Tale of Two Cities"},
+        {"value": 400, "clue": "Shakespeare play featuring the prince of Denmark", "response": "Hamlet"},
+        {"value": 600, "clue": "This Melville novel follows Captain Ahab's hunt", "response": "Moby-Dick"},
+        {"value": 800, "clue": "Jane Austen novel about Elizabeth Bennet and Mr. Darcy", "response": "Pride and Prejudice"},
+        {"value": 1000, "clue": "This Homeric epic follows Odysseus home to Ithaca", "response": "The Odyssey"}
+      ]
+    },
+    {
+      "category": "MUSICAL INSTRUMENTS",
+      "clues": [
+        {"value": 200, "clue": "This 88-key instrument is played by a pianist", "response": "piano"},
+        {"value": 400, "clue": "A woodwind with a single reed, common in jazz", "response": "clarinet"},
+        {"value": 600, "clue": "This brass instrument uses a slide", "response": "trombone"},
+        {"value": 800, "clue": "A string instrument played with a bow, the highest in an orchestra", "response": "violin"},
+        {"value": 1000, "clue": "This large double-reed woodwind is nicknamed the clown of the orchestra", "response": "bassoon"}
+      ]
+    },
+    {
+      "category": "KITCHEN MEASURES",
+      "clues": [
+        {"value": 200, "clue": "There are this many teaspoons in a tablespoon", "response": "three"},
+        {"value": 400, "clue": "A standard stick of butter weighs this many ounces", "response": "four"},
+        {"value": 600, "clue": "There are this many cups in a gallon", "response": "sixteen"},
+        {"value": 800, "clue": "Water boils at this temperature in degrees Fahrenheit at sea level", "response": "212"},
+        {"value": 1000, "clue": "A metric kilo prefix means this many base units", "response": "one thousand"}
+      ]
+    },
+    {
+      "category": "BODY SYSTEMS",
+      "clues": [
+        {"value": 200, "clue": "This organ pumps blood through the body", "response": "the heart"},
+        {"value": 400, "clue": "These paired organs exchange oxygen and carbon dioxide", "response": "the lungs"},
+        {"value": 600, "clue": "This large organ filters toxins from the blood", "response": "the liver"},
+        {"value": 800, "clue": "These bean-shaped organs filter waste into urine", "response": "the kidneys"},
+        {"value": 1000, "clue": "This organ controls thought, memory and movement", "response": "the brain"}
+      ]
+    },
+    {
+      "category": "WEATHER",
+      "clues": [
+        {"value": 200, "clue": "This precipitation falls as liquid drops", "response": "rain"},
+        {"value": 400, "clue": "This frozen precipitation forms ice crystals", "response": "snow"},
+        {"value": 600, "clue": "This violently rotating column of air touches the ground", "response": "a tornado"},
+        {"value": 800, "clue": "This large tropical storm has sustained winds over 74 miles per hour", "response": "a hurricane"},
+        {"value": 1000, "clue": "This instrument measures atmospheric pressure", "response": "a barometer"}
+      ]
+    },
+    {
+      "category": "U.S. PRESIDENTS",
+      "clues": [
+        {"value": 200, "clue": "This first U.S. president was called the Father of His Country", "response": "George Washington"},
+        {"value": 400, "clue": "This president issued the Emancipation Proclamation", "response": "Abraham Lincoln"},
+        {"value": 600, "clue": "This president is famous for the Panama Canal and the Rough Riders", "response": "Theodore Roosevelt"},
+        {"value": 800, "clue": "This president created the New Deal", "response": "Franklin D. Roosevelt"},
+        {"value": 1000, "clue": "This president wrote the Declaration of Independence", "response": "Thomas Jefferson"}
+      ]
+    },
+    {
+      "category": "SPORTS",
+      "clues": [
+        {"value": 200, "clue": "This sport's World Cup is played every four years", "response": "soccer"},
+        {"value": 400, "clue": "This sport is played on a hardwood court with a hoop", "response": "basketball"},
+        {"value": 600, "clue": "This sport uses racquets and a fuzzy yellow ball at Wimbledon", "response": "tennis"},
+        {"value": 800, "clue": "This sport uses clubs and a small dimpled ball", "response": "golf"},
+        {"value": 1000, "clue": "This 26.2-mile race commemorates a Greek messenger", "response": "the marathon"}
+      ]
+    },
+    {
+      "category": "COLORS",
+      "clues": [
+        {"value": 200, "clue": "Mixing red and blue paint gives this color", "response": "purple"},
+        {"value": 400, "clue": "Mixing yellow and blue paint gives this color", "response": "green"},
+        {"value": 600, "clue": "Mixing red and yellow paint gives this color", "response": "orange"},
+        {"value": 800, "clue": "Mixing black and white paint gives this shade", "response": "grey"},
+        {"value": 1000, "clue": "Red, yellow and blue are called this many primary colors", "response": "three"}
+      ]
+    },
+    {
+      "category": "TIME",
+      "clues": [
+        {"value": 200, "clue": "This is the number of hours in a day", "response": "24"},
+        {"value": 400, "clue": "This is the number of days in a leap year", "response": "366"},
+        {"value": 600, "clue": "This is the number of minutes in an hour", "response": "60"},
+        {"value": 800, "clue": "This is the number of seconds in a minute", "response": "60"},
+        {"value": 1000, "clue": "This is the number of days in a fortnight", "response": "14"}
+      ]
+    }
+  ],
+  "double": [
+    {
+      "category": "ANCIENT HISTORY",
+      "clues": [
+        {"value": 400, "clue": "This wonder stood in the harbor of Alexandria", "response": "the Lighthouse of Alexandria"},
+        {"value": 800, "clue": "Julius Caesar was assassinated on this date in 44 B.C.", "response": "the Ides of March"},
+        {"value": 1200, "clue": "This city was buried by Mount Vesuvius in 79 A.D.", "response": "Pompeii"},
+        {"value": 1600, "clue": "This Mesopotamian king created one of the earliest law codes", "response": "Hammurabi"},
+        {"value": 2000, "clue": "This Egyptian queen was the last active pharaoh of Ptolemaic Egypt", "response": "Cleopatra"}
+      ]
+    },
+    {
+      "category": "COMPUTER SCIENCE",
+      "clues": [
+        {"value": 400, "clue": "This base-2 digit is either 0 or 1", "response": "a bit"},
+        {"value": 800, "clue": "This algorithm searches a sorted list by halving it", "response": "binary search"},
+        {"value": 1200, "clue": "This 1970s language, created by Dennis Ritchie, underpins Unix", "response": "C"},
+        {"value": 1600, "clue": "This term describes a function that calls itself", "response": "recursion"},
+        {"value": 2000, "clue": "The P versus NP problem asks whether these two complexity classes are equal", "response": "P and NP"}
+      ]
+    },
+    {
+      "category": "PAINTING AND ART",
+      "clues": [
+        {"value": 400, "clue": "This da Vinci portrait hangs in the Louvre", "response": "the Mona Lisa"},
+        {"value": 800, "clue": "Dutch painter who cut off part of his ear", "response": "Vincent van Gogh"},
+        {"value": 1200, "clue": "This Spanish artist co-founded Cubism", "response": "Pablo Picasso"},
+        {"value": 1600, "clue": "Michelangelo painted this chapel's ceiling", "response": "the Sistine Chapel"},
+        {"value": 2000, "clue": "This 17th-century Dutch master painted The Night Watch", "response": "Rembrandt"}
+      ]
+    },
+    {
+      "category": "OCEANOGRAPHY",
+      "clues": [
+        {"value": 400, "clue": "The deepest known ocean trench, in the Pacific", "response": "the Mariana Trench"},
+        {"value": 800, "clue": "This warm ocean current flows from the Gulf of Mexico across the Atlantic", "response": "the Gulf Stream"},
+        {"value": 1200, "clue": "The largest ocean on Earth", "response": "the Pacific"},
+        {"value": 1600, "clue": "This phenomenon warms the central Pacific every few years", "response": "El Nino"},
+        {"value": 2000, "clue": "This term is the measure of dissolved salt in seawater", "response": "salinity"}
+      ]
+    },
+    {
+      "category": "MYTHOLOGY",
+      "clues": [
+        {"value": 400, "clue": "This Greek king of the gods wielded a thunderbolt", "response": "Zeus"},
+        {"value": 800, "clue": "This Norse god of thunder wields a hammer named Mjolnir", "response": "Thor"},
+        {"value": 1200, "clue": "This hero completed twelve labors", "response": "Heracles"},
+        {"value": 1600, "clue": "This winged horse sprang from Medusa's blood", "response": "Pegasus"},
+        {"value": 2000, "clue": "This Egyptian god of the afterlife has a jackal head", "response": "Anubis"}
+      ]
+    },
+    {
+      "category": "INVENTIONS",
+      "clues": [
+        {"value": 400, "clue": "This device invented by Alexander Graham Bell transmits voices", "response": "the telephone"},
+        {"value": 800, "clue": "This German press invented by Gutenberg used movable type", "response": "the printing press"},
+        {"value": 1200, "clue": "This Wright brothers invention first flew in 1903", "response": "the airplane"},
+        {"value": 1600, "clue": "This vaccine pioneer developed the polio vaccine in 1955", "response": "Jonas Salk"},
+        {"value": 2000, "clue": "This device, patented by Nikola Tesla, uses a rotating magnetic field", "response": "the AC induction motor"}
+      ]
+    },
+    {
+      "category": "CHEMISTRY",
+      "clues": [
+        {"value": 400, "clue": "This compound, H2O, is essential to life", "response": "water"},
+        {"value": 800, "clue": "This compound, NaCl, is common table salt", "response": "sodium chloride"},
+        {"value": 1200, "clue": "A neutral solution has this pH value", "response": "7"},
+        {"value": 1600, "clue": "This Italian scientist proposed Avogadro's number", "response": "Amedeo Avogadro"},
+        {"value": 2000, "clue": "This branch of chemistry studies carbon compounds", "response": "organic chemistry"}
+      ]
+    },
+    {
+      "category": "ASTRONOMY",
+      "clues": [
+        {"value": 400, "clue": "This natural satellite orbits the Earth", "response": "the Moon"},
+        {"value": 800, "clue": "This ringed planet is the sixth from the Sun", "response": "Saturn"},
+        {"value": 1200, "clue": "Our solar system lies in this galaxy", "response": "the Milky Way"},
+        {"value": 1600, "clue": "This region has gravity so strong that light cannot escape", "response": "a black hole"},
+        {"value": 2000, "clue": "This unit is the distance light travels in one year", "response": "a light year"}
+      ]
+    },
+    {
+      "category": "WORLD RIVERS",
+      "clues": [
+        {"value": 400, "clue": "This river flows through Egypt to the Mediterranean", "response": "the Nile"},
+        {"value": 800, "clue": "This South American river has the largest drainage basin", "response": "the Amazon"},
+        {"value": 1200, "clue": "This longest river in Asia flows through China", "response": "the Yangtze"},
+        {"value": 1600, "clue": "This river flows through Vienna, Budapest and Belgrade", "response": "the Danube"},
+        {"value": 2000, "clue": "This river flows south from Minnesota to the Gulf of Mexico", "response": "the Mississippi"}
+      ]
+    },
+    {
+      "category": "NOBEL PRIZES",
+      "clues": [
+        {"value": 400, "clue": "This Swedish inventor founded the prizes", "response": "Alfred Nobel"},
+        {"value": 800, "clue": "The Nobel Peace Prize is awarded in this Norwegian city", "response": "Oslo"},
+        {"value": 1200, "clue": "This scientist won Nobel Prizes in both physics and chemistry", "response": "Marie Curie"},
+        {"value": 1600, "clue": "The economics prize was added in this year", "response": "1969"},
+        {"value": 2000, "clue": "This scientist's 1921 physics prize honored the photoelectric effect", "response": "Albert Einstein"}
+      ]
+    },
+    {
+      "category": "LINGUISTICS",
+      "clues": [
+        {"value": 400, "clue": "This part of speech names a person, place or thing", "response": "a noun"},
+        {"value": 800, "clue": "This part of speech expresses an action or state", "response": "a verb"},
+        {"value": 1200, "clue": "This word or phrase reads the same forwards and backwards", "response": "a palindrome"},
+        {"value": 1600, "clue": "This word has the same meaning as another", "response": "a synonym"},
+        {"value": 2000, "clue": "This is the study of word origins", "response": "etymology"}
+      ]
+    },
+    {
+      "category": "ARCHITECTURE",
+      "clues": [
+        {"value": 400, "clue": "This iron tower stands on the Champ de Mars in Paris", "response": "the Eiffel Tower"},
+        {"value": 800, "clue": "This Roman amphitheater hosted gladiator games", "response": "the Colosseum"},
+        {"value": 1200, "clue": "This white marble mausoleum stands in Agra, India", "response": "the Taj Mahal"},
+        {"value": 1600, "clue": "This sail-shaped performing arts center stands on Sydney Harbour", "response": "the Sydney Opera House"},
+        {"value": 2000, "clue": "This bell tower in Italy leans because of unstable soil", "response": "the Leaning Tower of Pisa"}
+      ]
+    }
+  ],
+  "final": [
+    {"category": "ASTRONOMY FINAL", "value": 0, "clue": "This star, the nearest to Earth after the Sun, is a red dwarf in Centaurus", "response": "Proxima Centauri"},
+    {"category": "PHYSICS FINAL", "value": 0, "clue": "This constant, about 300 million meters per second, is the speed of light", "response": "c"},
+    {"category": "GEOGRAPHY FINAL", "value": 0, "clue": "This is the longest river in the world, flowing through northeastern Africa", "response": "the Nile"},
+    {"category": "BIOLOGY FINAL", "value": 0, "clue": "This molecule carries genetic instructions in most living things", "response": "DNA"},
+    {"category": "HISTORY FINAL", "value": 0, "clue": "This wall dividing a German city fell in 1989", "response": "the Berlin Wall"}
+  ]
+}

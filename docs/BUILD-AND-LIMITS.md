@@ -116,6 +116,18 @@ notices are retained; vendor redistribution rights are not asserted.
 - Native output reported 720x480 after warm boot versus 1920x1080 during final
   live acceptance. Full-width layout adapts to the vendor output; this is not
   a promise of persistent 1080p output on a stock boot. Inspect HDMI mode.
+- The Jeopardy! module cross-compiles the same big-endian MIPS32 target: a
+  static-musl authoritative service and a uClibc/EGL native renderer. Its rules,
+  LAN service, native renderer stack, QR and lifecycle are host-verified and its
+  `.rbox` passes archive/mode/limit/architecture checks. The native renderer and
+  LAN service are now verified on the development HR54-700 (a physical EGL
+  surface and a passing two-player LAN smoke test); long-session HDMI stability
+  is not separately claimed. **Receiver-side TV sound effects are currently
+  unsupported:** the only receiver audio path is the core decoder pipeline
+  (radio/IPTV) or the Doom-specific transport, and neither is a verified
+  interface for arbitrary native sound effects, so all tones play on the phone
+  (offline WebAudio) and receiver SFX are not claimed as accepted. See
+  `source/hr54-re/modules/jeopardy/README.md`.
 - IPTV needs a user playlist and receiver-compatible H.264/AAC/AC-3 media.
   MPEG-TS can pass through, and unencrypted H.264/AAC or H.264/AC-3 fMP4 HLS
   with in-band audio can be packet-copied to MPEG-TS. Separate HLS audio

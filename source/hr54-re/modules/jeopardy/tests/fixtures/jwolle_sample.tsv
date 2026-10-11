@@ -1,0 +1,17 @@
+round	clue_value	daily_double_value	category	comments	answer	question	air_date	notes
+1	200	0	TSV CAT		tsv one	R1	2020-05-05	
+1	400	0	TSV CAT		tsv two	R2	2020-05-05	
+1	600	0	TSV CAT		tsv three	R3	2020-05-05	
+1	800	0	TSV CAT		tsv four	R4	2020-05-05	
+1	1000	0	TSV CAT		tsv five	R5	2020-05-05	
+1	200	0	TSV CAT		tsv one	R1	2020-05-05	
+1	200	0	TSV CAT		tsv media	R6	2020-05-05	video clue
+2	400	0	TSV DJ CAT		tsv dj one	RD1	2020-05-05	
+2	800	0	TSV DJ CAT		tsv dj two	RD2	2020-05-05	
+2	1200	0	TSV DJ CAT		tsv dj three	RD3	2020-05-05	
+2	1600	500	TSV DJ CAT		tsv dj four	RD4	2020-05-05	
+2	2000	0	TSV DJ CAT		tsv dj five	RD5	2020-05-05	
+3	0	0	TSV FINAL		tsv final	RF	2020-05-05	
+9	200	0	TSV BAD		tsv bad	RB	2020-05-05	
+2	notanumber	0	TSV BAD		tsv bad2	RB2	2020-05-05	
+1	200	0			tsv nocat	RN	2020-05-05	

@@ -5,6 +5,13 @@ The packaged receiver binaries still use the previous backend until the service
 migrations and receiver builds are complete. Host foundation work alone is not
 physical acceptance.
 
+Source checkpoint (2026-10-08): the introduction above describes an earlier
+migration stage. The checked-out `reboxd/native_app.c`, module manager and
+`tools/build-runtime-bundle.py` now implement and package runtime native-app
+modules. The accepted receiver payload and physical deployment status remain
+separate from what this source can build. The Jeopardy! module uses that current
+native-app path; see [the Jeopardy guide](../source/hr54-re/modules/jeopardy/README.md).
+
 A module is a separately packaged executable, identified by a stable ID, with
 its own data and process. Core discovers manifests at runtime; client navigation
 must use these descriptors. Display names are never IDs. Maximum: 32 modules.
