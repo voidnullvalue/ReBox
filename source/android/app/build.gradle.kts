@@ -4,6 +4,39 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+// The Jeopardy phone controller page is bundled byte-for-byte from the module
+// source tree so the APK never carries a hand-maintained copy. The generated
+// asset lives under build/ (gitignored) and is registered through the Android
+// Variant API as a generated asset source directory.
+abstract class GenerateJeopardyAssets : DefaultTask() {
+    @get:InputFile abstract val source: RegularFileProperty
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction fun generate() {
+        val out = outputDir.get().asFile.resolve("jeopardy")
+        out.mkdirs()
+        out.listFiles()?.forEach { it.delete() }
+        source.get().asFile.copyTo(out.resolve("index.html"), overwrite = true)
+    }
+}
+
+val jeopardyIndex = rootProject.projectDir.parentFile.parentFile
+    .resolve("source/hr54-re/modules/jeopardy/assets/index.html")
+val generateJeopardyAssets = tasks.register<GenerateJeopardyAssets>("generateJeopardyAssets") {
+    description = "Bundle the reviewed Jeopardy module webpage into the controller APK assets."
+    source.set(jeopardyIndex)
+    outputDir.set(layout.buildDirectory.dir("generated/jeopardyAssets"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            generateJeopardyAssets,
+            GenerateJeopardyAssets::outputDir,
+        )
+    }
+}
+
 android {
     namespace = "com.hr54.controller"
     compileSdk = 37
@@ -11,8 +44,8 @@ android {
         applicationId = "com.hr54.controller"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {

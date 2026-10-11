@@ -18,11 +18,15 @@ data class ControllerState(
     val managedModule: String? = null, val cursor: BrowseCursor = BrowseCursor(), val history: List<BrowseCursor> = emptyList(),
     val page: MediaPage = MediaPage(), val settings: ModuleSettings = ModuleSettings(), val actionResult: ActionResult? = null,
     val paired: Boolean = false, val playback: Playback = Playback(), val system: SystemStatus = SystemStatus(),
+    val phoneController: Boolean = false,
     val loading: Boolean = false, val busy: Boolean = false, val error: String? = null, val message: String? = null,
 ) {
     fun module(id: String?) = modules.find { it.id == id }
     val homeModules get() = modules.filter { it.installed && it.enabled && it.home }
 }
+
+/** True when [id] is the LAN phone-controller module (the only one today). */
+fun ModuleDescriptor.supportsPhoneController(): Boolean = id == com.hr54.controller.game.JeopardyWebPolicy.MODULE_ID
 class ControllerViewModel(
     private val preferences: ReceiverPreferences? = null,
     private val apiFactory: (String) -> ReceiverApi = { HttpReceiverApi(it) },
@@ -103,8 +107,10 @@ class ControllerViewModel(
                 val available = active?.let { it.installed && it.enabled } ?: false
                 val managed = rows.find { it.id == s.managedModule }
                 val settingsGone = s.destination == "ModuleSettings" && (managed == null || !managed.installed || !managed.enabled || !managed.healthy)
+                val controllerGone = s.phoneController && (active == null || !active.installed || !active.enabled || !active.healthy)
                 s.copy(modules = rows, destination = if (s.destination == "Module" && !available) "Home" else if (settingsGone) "Modules" else s.destination,
                     settings = if (settingsGone) ModuleSettings() else s.settings,
+                    phoneController = s.phoneController && !controllerGone,
                     managedModule = s.managedModule.takeIf { id -> rows.any { it.id == id } })
             }
         } catch (e: Exception) { if (e is CancellationException) throw e; if (generation == epoch) update { it.copy(message = e.message) } }
@@ -114,7 +120,7 @@ class ControllerViewModel(
     private fun cancelBrowse() { ++loadGeneration; browsing?.cancel(); actionPoll?.cancel(); pendingAction = null }
     fun destination(name: String) {
         require(name in listOf("Home", "Settings", "Modules")); cancelBrowse()
-        update { it.copy(destination = name, loading = false, error = null, managedModule = null, actionResult = null) }
+        update { it.copy(destination = name, loading = false, error = null, managedModule = null, actionResult = null, phoneController = false) }
         if (name == "Modules") receiverScope?.launch { refreshModules() }
     }
     private fun load(retryAction: () -> Unit, block: suspend (ReceiverApi) -> Unit) {
@@ -127,6 +133,15 @@ class ControllerViewModel(
         }
     }
     fun retryList() { retry?.invoke() }
+    /** Opens the embedded, full-screen LAN phone controller for a healthy module. */
+    fun openPhoneController(id: String) {
+        val module = state.value.module(id) ?: return
+        if (!module.supportsPhoneController()) return
+        if (!module.installed || !module.enabled || !module.healthy) { update { it.copy(message = module.error.ifBlank { "Module unavailable" }) }; return }
+        cancelBrowse()
+        update { it.copy(destination = "Module", activeModule = id, loading = false, error = null, actionResult = null, phoneController = true) }
+    }
+    fun closePhoneController() = update { it.copy(phoneController = false) }
     fun openModule(id: String) {
         val module = state.value.module(id) ?: return; if (!module.installed || !module.enabled || !module.healthy) { update { it.copy(message = module.error.ifBlank { "Module unavailable" }) }; return }
         cancelBrowse(); update { it.copy(destination = "Module", activeModule = id, history = emptyList(), cursor = BrowseCursor(title = module.name), page = MediaPage(), loading = false, error = null, actionResult = null) }

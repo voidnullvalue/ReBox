@@ -33,6 +33,15 @@ python3 "$root/tools/gen_gap_db.py" --out "$build/gap.jdb"
 echo "== webpage =="
 python3 "$root/tools/embed_assets.py" --source "$root/assets/index.html" --output "$build/web_assets.h"
 
+# Headless UI/JS acceptance for the phone page: host quit/restart confirmations,
+# explicit cancel, local leave and the Android back contract. Node is optional.
+if command -v node >/dev/null 2>&1; then
+  echo "== webpage UI (node) =="
+  node "$here/test_webpage.mjs"
+else
+  echo "== webpage UI (node not installed; skipped) =="
+fi
+
 echo "== font atlas =="
 python3 "$root/tools/build_font_atlas.py" --font "$root/../../hr54-ui/assets/Overpass.ttf" --out "$root/src/jpq_font_data.h"
 

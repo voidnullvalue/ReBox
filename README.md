@@ -199,7 +199,11 @@ currently unsupported (there is no verified native audio-injection interface —
 see the module guide); phone audio works offline. Reboot persistence is
 delivered by the generic launcher boot hook and a deterministic fresh-boot
 simulation; the persisted rule survives boot, though no physical reboot was
-performed.
+performed. Release `0.3.2` fixes persistence recovery so a reloaded clean lobby
+comes back **unpaused** (players can `READY` and the host can `START` after a
+module upgrade or reboot) while every in-progress game still reloads safely
+paused on its saved timer remainder; interrupted quit/restart confirmations are
+dropped and players, scores, history, `epoch` and sequences are preserved.
 
 That is why the badge at the top says **EARLY ALPHA**.
 

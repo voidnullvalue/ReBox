@@ -67,7 +67,7 @@ class PreviewRenderTest {
         render("home") {
             Column {
                 Hr54TopBar("HR54", true, {}, {})
-                HomeScreen(previewState, {}, { _, _ -> }, {}, Modifier.weight(1f))
+                HomeScreen(previewState, {}, { _, _ -> }, {}, {}, Modifier.weight(1f))
             }
         }
 

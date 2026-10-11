@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
@@ -25,6 +26,7 @@ import androidx.lifecycle.compose.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hr54.controller.data.model.*
 import com.hr54.controller.data.repository.*
+import com.hr54.controller.game.*
 import com.hr54.controller.speech.whisper.WhisperEngine
 import com.hr54.controller.ui.*
 import com.hr54.controller.ui.components.*
@@ -49,6 +51,8 @@ class MainActivity : ComponentActivity() {
 fun ControllerApp(vm: ControllerViewModel, whisper: WhisperEngine) {
     val s by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var asset by remember { mutableStateOf<JeopardyAssetState>(JeopardyAssetState.Loading) }
+    var assetAttempt by remember { mutableIntStateOf(0) }
     var receiver by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     var query by rememberSaveable(s.activeModule, stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     var detail by remember { mutableStateOf<MediaItem?>(null) }
@@ -69,9 +73,20 @@ fun ControllerApp(vm: ControllerViewModel, whisper: WhisperEngine) {
     LaunchedEffect(s.destination, s.activeModule) { detail = null }
     LaunchedEffect(s.playback.playing) { if (!s.playback.playing) expanded = false }
     LaunchedEffect(s.message) { s.message?.let { snackbar.showSnackbar(it); vm.clearMessage() } }
-    BackHandler(expanded || detail != null || s.destination != "Home") {
+    LaunchedEffect(s.phoneController, assetAttempt) {
+        if (s.phoneController) {
+            asset = JeopardyAssetState.Loading
+            asset = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                loadJeopardyAsset { context.assets.open(JeopardyWebPolicy.ASSET_PATH).bufferedReader().use { it.readText() } }
+            }
+        }
+    }
+    BackHandler(!s.phoneController && (expanded || detail != null || s.destination != "Home")) {
         when { expanded -> expanded = false; detail != null -> detail = null; vm.up() -> Unit; s.destination == "Modules" -> vm.destination("Settings"); else -> vm.destination("Home") }
     }
+    // While the bundled page is loading or unreadable, Back closes the controller
+    // overlay (a safe return) instead of falling through to an implicit app exit.
+    BackHandler(s.phoneController && asset !is JeopardyAssetState.Ready) { vm.closePhoneController() }
     val actions: (String, Int?) -> Unit = { command, delta -> vm.transport(command, delta = delta) }
     CompositionLocalProvider(LocalModules provides s.modules, LocalMediaPage provides (s.activeModule to s.page.items)) {
         Surface(Modifier.fillMaxSize()) {
@@ -81,6 +96,13 @@ fun ControllerApp(vm: ControllerViewModel, whisper: WhisperEngine) {
                 Button(onClick = { if (lanDenied) context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri())) else lanRequest.launch(permissionName) }) { Text(if (lanDenied) "App permissions" else "Allow local network") }
             }
             else if (!s.ready) ReceiverSetup(s, receiver, { receiver = it }, { vm.connect(receiver.text) }, Modifier.safeDrawingPadding())
+            else if (s.phoneController && s.receiver != null) {
+                when (val loaded = asset) {
+                    is JeopardyAssetState.Ready -> JeopardyControllerScreen(s.receiver!!, loaded.html, vm::closePhoneController)
+                    is JeopardyAssetState.Failed -> ControllerAssetError(loaded.reason, onRetry = { assetAttempt++ }, onClose = vm::closePhoneController)
+                    JeopardyAssetState.Loading -> Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                }
+            }
             else Scaffold(
                 topBar = { Hr54TopBar(when (s.destination) { "Home" -> "ReBox"; "Module" -> s.module(s.activeModule)?.name ?: "Module"; "ModuleSettings" -> s.module(s.managedModule)?.name ?: "Module settings"; else -> s.destination }, s.connected, vm::retryConnection, { vm.destination("Settings") }) },
                 snackbarHost = { SnackbarHost(snackbar) },
@@ -99,8 +121,8 @@ fun ControllerApp(vm: ControllerViewModel, whisper: WhisperEngine) {
                 s.error?.let { InlineError(it, vm::retryList) }
                 Box(Modifier.weight(1f).then(destinationMotion(s.destination))) {
                     when (s.destination) {
-                        "Home" -> HomeScreen(s, vm::openModule, actions, { vm.transport("seek", seconds = it) })
-                        "Module" -> ModuleScreen(s, query, { query = it }, { vm.search(query.text) }, { if (it.kind == "item") detail = it else vm.select(it) }, vm::moreItems, vm::previousPage, { s.activeModule?.let(vm::moduleSettings) }, { start -> s.activeModule?.let { vm.nativeApp(it, start) } })
+                        "Home" -> HomeScreen(s, vm::openModule, actions, { vm.transport("seek", seconds = it) }, vm::openPhoneController)
+                        "Module" -> ModuleScreen(s, query, { query = it }, { vm.search(query.text) }, { if (it.kind == "item") detail = it else vm.select(it) }, vm::moreItems, vm::previousPage, { s.activeModule?.let(vm::moduleSettings) }, { start -> s.activeModule?.let { vm.nativeApp(it, start) } }, { s.activeModule?.let(vm::openPhoneController) })
                         "Settings" -> SettingsScreen(s, receiver, { receiver = it }, { vm.connect(receiver.text) }, vm::testConnection, whisper.status, { vm.destination("Modules") })
                         "Modules" -> ModuleManager(s, vm::manage, vm::moduleSettings, vm::install, vm::pair, vm::revokePairing)
                         "ModuleSettings" -> ModuleSettingsScreen(s, { field, value -> s.managedModule?.let { vm.saveField(it, field, value) } }, { action -> s.managedModule?.let { vm.moduleAction(it, action) } })

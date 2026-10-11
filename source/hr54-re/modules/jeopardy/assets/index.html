@@ -74,14 +74,27 @@ label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px;text-trans
 .buzz.first{background:radial-gradient(circle at 50% 20%,#b9ffd6,var(--good) 60%,#128a4a);color:#00230f}
 .state{text-align:center;font-weight:900;letter-spacing:.14em;text-transform:uppercase;font-size:clamp(14px,2vw,22px)}
 .state.ready{color:var(--gold)}.state.locked{color:var(--bad)}.state.first{color:var(--good)}
-.hostbar{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px;align-items:center}
+/* Host controls sit directly under the top bar, ahead of the board, so they are
+   always visible while the board/clue scroll and even when BUZZ is on screen.
+   flex:0 0 auto keeps the bar pinned as a fixed-height row of the column. */
+.hostbar{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px;align-items:center;flex:0 0 auto;
+  background:linear-gradient(180deg,rgba(6,16,48,.97),rgba(6,16,48,.72));
+  border-bottom:1px solid rgba(245,197,66,.25);z-index:15}
 .hostbar button{padding:10px 12px;font-size:14px}
+.hostbar .grow{flex:1}
 .panel{position:absolute;inset:auto 12px 12px auto;width:min(420px,92vw);max-height:80vh;overflow:auto;
   background:var(--panel);border:1px solid rgba(245,197,66,.3);border-radius:18px;padding:16px;box-shadow:0 30px 80px rgba(0,0,0,.6);z-index:20}
 .panel h3{margin-bottom:8px}
 .panel .row{margin-top:8px}
 .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.overlay{position:fixed;inset:0;background:rgba(3,8,24,.72);display:flex;align-items:center;justify-content:center;z-index:40}
+.overlay{position:fixed;inset:0;background:rgba(3,8,24,.72);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px}
+.modal{width:min(480px,94vw);background:var(--panel);border:1px solid rgba(245,197,66,.3);
+  border-radius:20px;padding:22px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.modal h3{font-size:22px;margin:8px 0 8px}
+.modal p{color:var(--dim);font-size:14px;line-height:1.45;margin:0 0 4px}
+.modal .note{font-size:12px;color:var(--dim);min-height:15px;margin-top:6px}
+.modal .actions{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.modal .actions .row{gap:10px}
 .badge{font-size:12px;color:var(--dim)}
 .scroll{overflow:auto}
 @media (max-width:640px){.board{gap:4px;padding:5px}}
@@ -117,6 +130,14 @@ label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px;text-trans
     </div>
   </div>
 
+  <div id="left" class="center hide">
+    <div class="card">
+      <h1 class="title" style="font-size:28px">Controller closed</h1>
+      <p id="left-msg" class="badge">You left the controller. The game keeps running on the TV.</p>
+      <div class="row" style="margin-top:14px"><button id="left-return" class="primary">Return to game</button></div>
+    </div>
+  </div>
+
   <div id="game" class="hide" style="flex:1;display:flex;flex-direction:column">
     <div class="topbar">
       <span class="title gold">Jeopardy!</span>
@@ -126,7 +147,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px;text-trans
       <span id="conn" class="badge">connecting…</span>
       <span id="timer" class="timer"></span>
       <button id="mute" class="ghost" style="padding:6px 10px;font-size:12px">AUDIO</button>
+      <button id="leave" class="ghost" style="padding:6px 10px;font-size:12px">LEAVE</button>
     </div>
+    <div id="hostbar" class="hostbar hide"></div>
     <div id="scoreboard" class="scoreboard"></div>
     <div id="board" class="board scroll hide"></div>
     <div id="clue" class="clue hide"></div>
@@ -142,9 +165,9 @@ label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px;text-trans
       <div id="state" class="state">Lobby</div>
       <button id="buzz" class="buzz" disabled>BUZZ</button>
     </div>
-    <div id="hostbar" class="hostbar hide"></div>
     <div id="panel" class="panel hide"></div>
   </div>
+  <div id="modal" class="overlay hide"></div>
 </div>
 <script>
 "use strict";
@@ -153,6 +176,22 @@ const $=(id)=>document.getElementById(id);
 const slot={ token:null, role:null, playerId:null, seq:0 };
 let ws=null, state=null, colors={}, reconnectTimer=null, txSeq=0, deadline=0, timerKind=0, paused=false, renderedTick=0;
 let prevPhase=null, prevMyScore=null, lastCountSec=-1;
+
+/* Host confirmation gate. A quit/restart is a two-step, receiver-acknowledged
+ * operation: the first press arms it, the TV (the authoritative core) echoes
+ * quit_confirm/restart_confirm in the next state, only then is Commit enabled,
+ * and a second press commits. Cancel sends JPQ_ACT_CANCEL and waits for the
+ * core to clear the flags. No browser dialogs and no timing-based double-send:
+ * this works inside an Android WebView that never renders the native dialogs. */
+let hostGate=null;      /* {kind,armed,pending,committing,cancelling,epoch,window,error} */
+let uiModal=null;       /* {type:'hostgate'|'hostexit'|'exit'} */
+/* Set while a host leave is waiting for the core to acknowledge the CANCEL that
+ * disarms a pending quit/restart. We do not fire the close event until then, so
+ * a hidden controller can never leave the server's confirmation armed. */
+let pendingLeave=false;
+/* Once the controller has left, no timer/close callback may reconnect it. Reset
+ * only by an explicit returnToGame(). */
+let left=false;
 
 /* ---------- offline WebAudio tones (original; no show assets) ---------- */
 let actx=null, muted=localStorage.getItem("jpq.mute")==="1";
@@ -176,11 +215,11 @@ function setConn(t,ok){ $("conn").textContent=t; $("conn").style.color=ok?"var(-
 function connect(){
   try{ ws=new WebSocket(wsURL()); }catch(e){ scheduleReconnect(); return; }
   ws.onopen=()=>{ setConn("live",true); if(slot.token) send({type:"hello",token:slot.token}); else if(slot.role==="public") send({type:"spectate"}); };
-  ws.onclose=()=>{ setConn("reconnecting…",false); scheduleReconnect(); };
+  ws.onclose=()=>{ setConn("reconnecting…",false); failPendingGate("Disconnected — press again after reconnecting."); scheduleReconnect(); };
   ws.onerror=()=>{};
   ws.onmessage=(ev)=>{ let m; try{ m=JSON.parse(ev.data); }catch(e){ return; } handle(m); };
 }
-function scheduleReconnect(){ if(reconnectTimer) return; reconnectTimer=setTimeout(()=>{ reconnectTimer=null; connect(); },1200); }
+function scheduleReconnect(){ if(left) return; if(reconnectTimer) return; reconnectTimer=setTimeout(()=>{ reconnectTimer=null; if(left) return; connect(); },1200); }
 function send(obj){ if(ws&&ws.readyState===1){ ws.send(JSON.stringify(obj)); return true; } return false; }
 function cmd(action,fields){ const o=Object.assign({type:"cmd",seq:++txSeq,epoch:state?state.epoch:1,window:state?state.window:0,action:action},fields||{}); return send(o); }
 
@@ -217,24 +256,267 @@ $("do-host").onclick=async()=>{
 };
 $("do-spectate").onclick=()=>{ slot.role="public"; slot.token=null; enterGame(); if(!ws||ws.readyState>1) connect(); else send({type:"spectate"}); };
 
-function enterGame(){ $("auth").classList.add("hide"); $("game").classList.remove("hide"); }
+function enterGame(){ $("auth").classList.add("hide"); $("left").classList.add("hide"); $("game").classList.remove("hide"); }
 
 /* ---------- message handling ---------- */
 function handle(m){
-  if(m.type==="state"){ state=m; colors=m.colors||{}; txSeq=Math.max(txSeq,m.seq||0);
+  if(m.type==="state"){
+    /* A new epoch means the core rebuilt the game (start/restart/relaunch), so
+     * any confirmation armed against the previous epoch is stale and is dropped
+     * without ever touching the wire. */
+    if(hostGate && hostGate.epoch!=null && m.epoch!=null && hostGate.epoch!==m.epoch) closeHostGate();
+    state=m; colors=m.colors||{}; txSeq=Math.max(txSeq,m.seq||0);
     deadline=(m.state.timer&&m.state.timer.remaining_ms&&!m.state.paused)?Date.now()+m.state.timer.remaining_ms:0;
     timerKind=m.state.timer?m.state.timer.kind:0; paused=!!m.state.paused;
     const st=m.state, my=slot.role==="player"?st.players.find(p=>p.id===slot.playerId):null;
     if(prevPhase!==null&&st.phase!==prevPhase) sfx("transition");
     if(st.phase===8&&prevPhase!==8){ const lead=st.results&&st.results.leader; if(slot.role==="player"&&lead!=null&&st.players[lead]&&st.players[lead].id===slot.playerId) sfx("win"); }
     if(my){ if(prevMyScore!==null){ if(my.score>prevMyScore) sfx("correct"); else if(my.score<prevMyScore) sfx("incorrect"); } prevMyScore=my.score; }
-    prevPhase=st.phase; render(); return; }
+    prevPhase=st.phase;
+    reconcileHostGate(m);
+    render(); return;
+  }
   if(m.type==="welcome"){ if(slot.token){ send({type:"hello",token:slot.token}); } return; }
-  if(m.type==="error"){ flash(m.error||m.code||"error"); return; }
+  if(m.type==="error"){
+    if(hostGate&&(hostGate.pending||hostGate.committing||hostGate.cancelling)){
+      hostGate.pending=hostGate.committing=hostGate.cancelling=false;
+      if(pendingLeave) pendingLeave=false; /* a rejected cancel fails closed: stay connected */
+      hostGate.error=m.error||m.code||"Rejected by the TV.";
+      renderModal();
+    }
+    flash(m.error||m.code||"error"); return;
+  }
 }
 let flashTimer=null;
 function flash(msg){ const e=$("auth-err"); if(e&&!$("auth").classList.contains("hide")){ authErr(msg); return; }
   const s=$("state"); s.textContent=msg; s.style.color="var(--bad)"; clearTimeout(flashTimer); flashTimer=setTimeout(render,1500); }
+
+/* ---------- host confirmation gate ---------- */
+function reconcileHostGate(m){
+  if(!hostGate){ if(pendingLeave) pendingLeave=false; return; }
+  const st=m.state;
+  let cleared=false;
+  if(hostGate.kind==="quit"){
+    if(st.quit){ cleared=true; }
+    else if(st.quit_confirm&&!hostGate.cancelling){ hostGate.armed=true; hostGate.pending=false; hostGate.error=""; }
+    else if(hostGate.cancelling&&!st.quit_confirm){ cleared=true; }
+  } else {
+    if(hostGate.committing&&st.phase===0&&!st.restart_confirm){ cleared=true; }
+    else if(st.restart_confirm&&!hostGate.cancelling){ hostGate.armed=true; hostGate.pending=false; hostGate.error=""; }
+    else if(hostGate.cancelling&&!st.restart_confirm){ cleared=true; }
+  }
+  /* The core has confirmed the confirmation is gone (cancelled or committed).
+   * If this clear was the disarm we needed before leaving, complete the leave. */
+  if(cleared){ closeHostGate(); if(pendingLeave) performLeave(); }
+}
+function failPendingGate(msg){
+  if(hostGate&&(hostGate.pending||hostGate.committing||hostGate.cancelling)){
+    const wasCancelling=hostGate.cancelling;
+    hostGate.pending=hostGate.committing=hostGate.cancelling=false;
+    if(pendingLeave||wasCancelling){
+      /* A cancel (or a cancel-before-leave) was in flight and we lost the
+       * socket before the core acked it. Fail closed: stay connected, do not
+       * leave, and never pretend the confirmation was cancelled. */
+      pendingLeave=false;
+      hostGate.error="Disconnected before the TV confirmed the cancel — nothing was cancelled. Reconnect and try again.";
+    } else if(!hostGate.armed){ hostGate.error=msg; }
+    renderModal();
+  } else if(pendingLeave){ pendingLeave=false; }
+}
+function openHostConfirm(kind){
+  const st=state?state.state:null;
+  const already=!!(st&&(kind==="quit"?st.quit_confirm:st.restart_confirm));
+  pendingLeave=false;
+  hostGate={kind:kind,armed:already,pending:false,committing:false,cancelling:false,
+            epoch:state?state.epoch:null,window:state?state.window:null,error:""};
+  uiModal={type:"hostgate"};
+  renderModal();
+}
+function closeHostGate(){ hostGate=null; if(uiModal&&uiModal.type==="hostgate") uiModal=null; renderModal(); }
+function hostConfirmArm(){
+  if(!hostGate||hostGate.pending||hostGate.armed||hostGate.committing||hostGate.cancelling) return;
+  if(slot.role!=="host") return; /* only the authenticated host may arm a quit/restart */
+  hostGate.epoch=state?state.epoch:hostGate.epoch;
+  hostGate.window=state?state.window:hostGate.window;
+  hostGate.error="";
+  const ok=cmd(hostGate.kind==="quit"?"QUIT":"RESTART");
+  if(ok){ hostGate.pending=true; } else { hostGate.error="Not connected — try again in a moment."; }
+  renderModal();
+}
+function hostConfirmCommit(){
+  if(!hostGate||!hostGate.armed) return;
+  if(hostGate.pending||hostGate.committing||hostGate.cancelling) return;
+  /* A stale render/button can never commit: require the current authenticated
+   * host role and the exact epoch/window the arm was confirmed against, so a
+   * commit after a Cancel, reconnect or unseen restart never touches the wire. */
+  if(slot.role!=="host") return;
+  if(!state) return;
+  if(hostGate.epoch!=null&&state.epoch!=null&&hostGate.epoch!==state.epoch) return;
+  if(hostGate.window!=null&&state.window!=null&&hostGate.window!==state.window) return;
+  const ok=cmd(hostGate.kind==="quit"?"QUIT":"RESTART");
+  if(ok){ hostGate.committing=true; } else { hostGate.error="Not connected — try again in a moment."; }
+  renderModal();
+}
+function hostConfirmCancel(){
+  if(!hostGate) return;
+  /* A commit already on the wire cannot be undone, and a cancel already sent is
+   * still in flight — never send a second CANCEL or pretend either is reversible. */
+  if(hostGate.committing||hostGate.cancelling) return;
+  if(hostGate.pending||hostGate.armed){
+    const ok=cmd("CANCEL");
+    if(!ok){ hostGate.error="Not connected — can't cancel safely. Reconnect and try again."; renderModal(); return; }
+    hostGate.cancelling=true; hostGate.pending=false;
+    renderModal();
+  } else { closeHostGate(); }
+}
+
+/* ---------- modal / exit / leave ---------- */
+function modalHide(){ const m=$("modal"); m.classList.add("hide"); m.innerHTML=""; }
+function modalShow(html){ const m=$("modal"); m.innerHTML=html; m.classList.remove("hide"); }
+function renderModal(){
+  if(!uiModal){ modalHide(); return; }
+  if(uiModal.type==="hostgate"&&hostGate){ modalShow(hostGateHtml()); bindHostGate(); return; }
+  if(uiModal.type==="hostexit"){ modalShow(hostExitHtml()); bindHostExit(); return; }
+  if(uiModal.type==="exit"){ modalShow(exitHtml()); bindExit(); return; }
+  modalHide();
+}
+function hostGateHtml(){
+  const g=hostGate, quit=g.kind==="quit";
+  const title=quit?"Quit game?":"Restart game?";
+  const body=quit
+    ?"This ends the game on the shared TV. Other players are dropped back to the lobby."
+    :"This clears every score and deals a fresh board. The TV confirms before anything changes.";
+  let label,dis=false;
+  if(g.committing){ label=quit?"Quitting…":"Restarting…"; dis=true; }
+  else if(g.cancelling){ label="Cancelling…"; dis=true; }
+  else if(g.pending){ label="Waiting for the TV…"; dis=true; }
+  else if(g.armed){ label=quit?"Confirm quit":"Confirm restart"; }
+  else { label=quit?"Quit game":"Restart game"; }
+  const note=g.error?g.error:(g.armed?"The TV is ready. Press again to confirm.":(g.pending?"Waiting for the TV to confirm…":""));
+  return '<div class="modal">'
+    +'<span class="pill gold">Host</span>'
+    +'<h3 class="gold">'+esc(title)+'</h3>'
+    +'<p>'+esc(body)+'</p>'
+    +'<p class="note">'+esc(note)+'</p>'
+    +'<div class="actions">'
+    +'<button id="hg-primary" class="danger"'+(dis?" disabled":"")+'>'+esc(label)+'</button>'
+    +'<button id="hg-leave" class="ghost">Leave controller</button>'
+    +'<button id="hg-cancel" class="ghost"'+((g.cancelling||g.committing)?" disabled":"")+'>Cancel</button>'
+    +'</div></div>';
+}
+function hostExitHtml(){
+  return '<div class="modal">'
+    +'<span class="pill gold">Host</span>'
+    +'<h3 class="gold">Host controls</h3>'
+    +'<p>Quit game ends it on the TV. Leave controller only closes this phone — the game keeps running and you can return.</p>'
+    +'<div class="actions">'
+    +'<button id="hx-quit" class="danger">Quit game</button>'
+    +'<button id="hx-leave" class="ghost">Leave controller</button>'
+    +'<button id="hx-cancel" class="primary">Cancel</button>'
+    +'</div></div>';
+}
+function exitHtml(){
+  return '<div class="modal">'
+    +'<h3 class="gold">Leave controller?</h3>'
+    +'<p>You can rejoin later with the same name and score. The game keeps running on the TV.</p>'
+    +'<div class="actions">'
+    +'<button id="exit-stay" class="primary">Stay</button>'
+    +'<button id="exit-leave" class="ghost danger">Leave controller</button>'
+    +'</div></div>';
+}
+function bindHostGate(){
+  const p=$("hg-primary"); if(p) p.onclick=()=>{ if(hostGate&&hostGate.armed) hostConfirmCommit(); else hostConfirmArm(); };
+  const l=$("hg-leave"); if(l) l.onclick=()=>doLeave();
+  const c=$("hg-cancel"); if(c) c.onclick=()=>hostConfirmCancel();
+}
+function bindHostExit(){
+  const q=$("hx-quit"); if(q) q.onclick=()=>openHostConfirm("quit");
+  const l=$("hx-leave"); if(l) l.onclick=()=>doLeave();
+  const c=$("hx-cancel"); if(c) c.onclick=()=>{ uiModal=null; renderModal(); };
+}
+function bindExit(){
+  const s=$("exit-stay"); if(s) s.onclick=()=>{ uiModal=null; renderModal(); };
+  const l=$("exit-leave"); if(l) l.onclick=()=>doLeave();
+}
+/* Local leave. A host that still has an armed/pending quit/restart MUST disarm
+ * it on the authoritative core before the phone goes away, or the server flag
+ * stays armed for the next controller. So we send CANCEL and wait for the core
+ * to clear it, then fire the close event. If the CANCEL can't be sent, or the
+ * socket drops while we wait, we fail closed: stay connected and tell the host,
+ * never pretend the confirmation was cancelled. An ordinary player/spectator
+ * never sends a host command — for them the leave is purely local. */
+function doLeave(){
+  if(slot.role==="host"&&hostGate&&(hostGate.pending||hostGate.armed||hostGate.cancelling||hostGate.committing)){
+    uiModal={type:"hostgate"};
+    if(hostGate.committing){
+      hostGate.error=hostGate.kind==="quit"?
+        "Already quitting — the TV is applying it, so leaving can't undo it.":
+        "Already restarting — the TV is applying it, so leaving can't undo it.";
+      renderModal();
+      return;
+    }
+    if(hostGate.cancelling){ pendingLeave=true; renderModal(); return; }
+    const ok=cmd("CANCEL");
+    if(!ok){ hostGate.error="Not connected — can't cancel safely. Reconnect and try again."; renderModal(); return; }
+    hostGate.cancelling=true; hostGate.pending=false; pendingLeave=true;
+    renderModal();
+    return;
+  }
+  performLeave();
+}
+function performLeave(){
+  /* Drop every way this hidden controller could come back to life: stop the
+   * reconnect timer, detach the socket callbacks, and mark ourselves left so a
+   * late timer/close callback can never reconnect. Stored tokens are kept so
+   * "Return to game" can re-authenticate the same seat explicitly. */
+  pendingLeave=false;
+  left=true;
+  if(reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null; }
+  if(ws){ try{ ws.onopen=ws.onclose=ws.onerror=ws.onmessage=null; ws.close(); }catch(e){} ws=null; }
+  uiModal=null; hostGate=null; renderModal();
+  $("game").classList.add("hide"); $("auth").classList.add("hide"); $("left").classList.remove("hide");
+  $("left-msg").textContent=slot.role==="host"
+    ?"You left the host controller. The game keeps running on the TV."
+    :"You left the controller. The game keeps running on the TV.";
+  dispatchControllerClose();
+}
+function returnToGame(){
+  /* Re-enable the controller explicitly; only this clears the left latch. */
+  left=false; pendingLeave=false;
+  $("left").classList.add("hide"); $("auth").classList.add("hide"); $("game").classList.remove("hide");
+  if(!ws||ws.readyState>1) connect(); else resumeSend();
+}
+function resumeSend(){ if(slot.role==="public") send({type:"spectate"}); else if(slot.token) send({type:"hello",token:slot.token}); }
+function dispatchControllerClose(){
+  try{ window.dispatchEvent(new CustomEvent("rebox-controller-close",{detail:{role:slot.role||null}})); }catch(e){}
+}
+/* Android back button contract: no Java bridge. Uses only the authenticated
+ * browser role. Hosts get Quit/Leave/Cancel; players/spectators get Stay/Leave.
+ * Returns true when this page took over the back gesture. */
+function requestExit(){
+  if(!slot.role) return false;
+  /* Android back while a host confirmation is on screen is NOT a leave: the
+   * server may still have quit_confirm/restart_confirm armed, and swapping in
+   * the leave menu would strand it. Cancel explicitly and keep the gate up
+   * until the core acknowledges. A commit already in flight can't be undone, so
+   * show that instead of offering a cancel that would not hold. */
+  if(slot.role==="host"&&hostGate){
+    uiModal={type:"hostgate"};
+    if(hostGate.committing){
+      hostGate.error=hostGate.kind==="quit"?
+        "Already quitting — the TV is applying it.":"Already restarting — the TV is applying it.";
+      renderModal();
+      return true;
+    }
+    hostConfirmCancel();
+    return true;
+  }
+  uiModal={type:slot.role==="host"?"hostexit":"exit"};
+  renderModal();
+  return true;
+}
+$("leave").onclick=()=>{ requestExit(); };
+$("left-return").onclick=returnToGame;
 
 /* ---------- rendering ---------- */
 function pByIndex(i){ return state&&state.state.players?state.state.players[i]:null; }
@@ -264,12 +546,10 @@ function renderBoard(){
     const cell=c.clues[r]; const d=document.createElement("div");
     d.className="cell"+(cell.used?" used":"");
     d.textContent=cell.used?"":cell.value;
-    d.onclick=()=>{ if(cell.used) return; if(slot.role!=="host" && !canSelect()) return; if(!confirmSelect()) return; cmd("SELECT",{target:col*5+r}); };
+    d.onclick=()=>{ if(cell.used) return; if(slot.role!=="host" && !canSelect()) return; cmd("SELECT",{target:col*5+r}); };
     b.appendChild(d);
   });
 }
-let confirmSelectCell=null;
-function confirmSelect(){ return true; }
 function canSelect(){ return state&&state.state.phase===1 && (slot.role==="host" || pByIndex(state.state.selector)&&pByIndex(state.state.selector).id===slot.playerId); }
 function renderClue(){
   const el=$("clue"); const st=state?state.state:null;
@@ -321,15 +601,20 @@ function renderPlayerForms(){
   const w=$("do-wager"); if(w) w.onclick=()=>{ const v=parseInt($("wager").value||"0",10); cmd("WAGER",{value:v}); };
   const s2=$("do-submit"); if(s2) s2.onclick=()=>{ cmd("SUBMIT",{text:$("answer").value||""}); };
 }
+/* The host bar renders directly under the top bar and always carries Pause/
+ * Resume and Quit, so the host is never stranded mid-scroll or behind BUZZ. */
 function renderHost(){
   const bar=$("hostbar"); const st=state?state.state:null;
-  if(!st||slot.role!=="host"){ bar.classList.add("hide"); $("panel").classList.add("hide"); return; }
+  if(!st||slot.role!=="host"){ bar.classList.add("hide"); return; }
   bar.classList.remove("hide");
   const p=st.phase;
   let btns=[];
-  if(p===0) btns.push(["START","primary"],["RESET_LOBBY","ghost"],["SETTINGS","ghost"]);
-  else btns.push(["PAUSE","ghost"],["RESUME","ghost"],["RESTART","danger"],["QUIT","danger"],["SETTINGS","ghost"],["FILTERS","ghost"]);
-  if(p===0) state.state.players.forEach(pl=>btns.push(["REMOVE:"+pl.id,"danger"]));
+  if(p===0){ btns.push(["START","primary"],["RESET_LOBBY","ghost"],["SETTINGS","ghost"]); }
+  else {
+    btns.push(st.paused?["RESUME","primary"]:["PAUSE","ghost"]);
+    btns.push(["SETTINGS","ghost"],["FILTERS","ghost"]);
+  }
+  if(p===0) st.players.forEach(pl=>btns.push(["REMOVE:"+pl.id,"danger"]));
   if(st.clue){ btns.unshift(["REVEAL","ghost"],["ADVANCE","primary"]);
     if((p===2||p===9)&&st.buzzed>=0&&st.buzzed!=null){ const bz=pByIndex(st.buzzed); if(bz) btns.unshift(["PASS:"+bz.id,"ghost"]); }
   }
@@ -337,20 +622,26 @@ function renderHost(){
   if(p===4){ const bz=pByIndex(st.dd_selector); if(bz) btns.unshift(["CORRECT:"+bz.id,"primary"],["WRONG:"+bz.id,"danger"]); }
   if(p===7){ const cur=pByIndex(st.judge_cursor); if(cur) btns.unshift(["JUDGE_CORRECT:"+cur.id,"primary"],["JUDGE_WRONG:"+cur.id,"danger"]); }
   if(p===8) btns.unshift(["TIEBREAK","primary"]);
+  if(p!==0) btns.push(["RESTART","danger"]);
+  btns.push(["QUIT","danger"],["LEAVE","ghost"]);
   bar.innerHTML="";
   btns.forEach(([label,cls])=>{
     const [cmdName,arg]=label.split(":");
-    const b=document.createElement("button"); b.textContent=cmdName.replace("_"," ").toLowerCase(); b.className=cls;
+    const b=document.createElement("button"); b.textContent=hostLabel(cmdName); b.className=cls;
     b.onclick=()=>hostAction(cmdName,arg); bar.appendChild(b);
   });
 }
+function hostLabel(name){ return {RESET_LOBBY:"reset lobby",JUDGE_CORRECT:"judge correct",JUDGE_WRONG:"judge wrong"}[name]||name.toLowerCase(); }
+/* Host-only actions. A host never sees these unless the authenticated role is
+ * "host"; an ordinary player/spectator never reaches this function. */
 function hostAction(name,arg){
   if(name==="START") return cmd("START");
   if(name==="RESET_LOBBY") return cmd("RESET_LOBBY");
   if(name==="PAUSE") return cmd("PAUSE");
   if(name==="RESUME") return cmd("RESUME");
-  if(name==="RESTART"){ if(confirm("Restart the game? Press OK to confirm.")){ cmd("RESTART"); setTimeout(()=>cmd("RESTART"),60); } return; }
-  if(name==="QUIT"){ if(confirm("Quit the current game?")){ cmd("QUIT"); setTimeout(()=>cmd("QUIT"),60); } return; }
+  if(name==="RESTART"){ openHostConfirm("restart"); return; }
+  if(name==="QUIT"){ openHostConfirm("quit"); return; }
+  if(name==="LEAVE"){ requestExit(); return; }
   if(name==="REMOVE") return cmd("REMOVE",{target:Number(arg)});
   if(name==="SETTINGS") return openSettings();
   if(name==="FILTERS") return openFilters();
@@ -402,7 +693,7 @@ function render(){
   $("round-pill").textContent=roundName(st.round)||(st.phase===0?"Lobby":"");
   $("phase-pill").textContent=paused?"PAUSED":"";
   $("phase-pill").classList.toggle("hide",!paused);
-  renderScores(); renderBoard(); renderClue(); renderLobby(); renderBuzz(); renderPlayerForms(); renderHost();
+  renderScores(); renderBoard(); renderClue(); renderLobby(); renderBuzz(); renderPlayerForms(); renderHost(); renderModal();
 }
 function tickTimer(){
   const el=$("timer");
@@ -420,17 +711,34 @@ $("mute").onclick=()=>{ muted=!muted; localStorage.setItem("jpq.mute",muted?"1":
 $("mute").textContent=muted?"MUTED":"AUDIO";
 document.addEventListener("pointerdown",audioInit,{once:true});
 
+/* Android contract: a plain JS API the WebView's back handler may call. No Java
+ * bridge, no privileged token, and it never sends a command by itself. */
+window.ReboxJeopardy={
+  version:1,
+  closeEvent:"rebox-controller-close",
+  requestExit:function(){ return requestExit(); }
+};
+
 /* ---------- boot ---------- */
 initColorSelect();
 /* A scanned lobby QR carries the join PIN in the URL fragment. */
 try{ const mm=/[#&]pin=(\d+)/.exec(location.hash||""); if(mm) $("p-pin").value=mm[1]; }catch(e){}
 (function boot(){
   const t=localStorage.getItem("jpq.token"); const h=localStorage.getItem("jpq.host");
-  // try player resume first
   connect();
   const tryResume=()=>{
-    if(t){ post("/api/join",{token:t}).then(r=>{ if(r.ok){ slot.token=r.j.token; slot.role="player"; slot.playerId=r.j.playerId; enterGame(); send({type:"hello",token:slot.token}); } else { localStorage.removeItem("jpq.token"); } }); }
-    else if(h){ post("/api/host",{pin:""}).then(()=>{}); }
+    const tok=t||h;
+    if(!tok) return;
+    /* /api/join accepts either a player or the host token, preserving the seat
+     * and score across a reconnect after "leave controller". */
+    post("/api/join",{token:tok}).then(r=>{
+      if(r.ok){
+        slot.token=r.j.token; slot.playerId=r.j.playerId!=null?r.j.playerId:null;
+        slot.role=r.j.role==="host"?"host":"player";
+        if(slot.role==="host") localStorage.setItem("jpq.host",r.j.token); else localStorage.setItem("jpq.token",r.j.token);
+        enterGame(); resumeSend();
+      } else { localStorage.removeItem("jpq.token"); localStorage.removeItem("jpq.host"); }
+    });
   };
   setTimeout(tryResume,300);
 })();

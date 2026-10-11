@@ -521,7 +521,65 @@ def test_reconnect_and_restart(svc):
     check(pid3 == a.player_id, "identity survives restart")
     score3 = next(x["score"] for x in a3.players() if x["id"] == pid3)
     check(score3 == score, "score survives restart")
+    # an in-progress game must come back safely paused, never auto-resumed
+    host3 = Player.host(svc2, svc2.metadata["hostPin"])
+    check(host3.gs["phase"] not in (LOBBY,), "in-progress phase survives restart")
+    check(host3.gs["paused"], "in-progress restart resumes paused")
+    host3.close()
     a3.close()
+    return svc2
+
+
+def test_lobby_restart_ready_start(svc):
+    """A module upgrade/reboot that reloads a clean LOBBY must not stay paused:
+    the preserved players can READY and the host can START. The phone therefore
+    never needs the native paused-overlay RESUME workaround."""
+    pin = svc.metadata["joinPin"]
+    host = Player.host(svc, svc.metadata["hostPin"])
+    configure_fast(host)
+    a, b = join_players(svc, ["Rae", "Sam"], pin)
+    # A real loadable lobby is a game that has been started and then reset to
+    # the lobby (boards exist, round is J): start then RESET_LOBBY.
+    host.cmd("START")
+    host.wait_phase(BOARD)
+    host.cmd("RESET_LOBBY")
+    host.wait_phase(LOBBY)
+    check(host.gs["phase"] == LOBBY, "lobby before restart")
+    check(not host.gs["paused"], "lobby live before restart")
+    ids = sorted(p["id"] for p in host.players())
+    token_a, token_b = a.token, b.token
+    data = svc.data
+    host.close(); a.close(); b.close()
+    svc.stop()
+    time.sleep(0.2)
+
+    svc2 = Service(svc.exe, data, svc.db)
+    host2 = Player.host(svc2, svc2.metadata["hostPin"])
+    check(host2.gs["phase"] == LOBBY, "restart reloads LOBBY")
+    check(not host2.gs["paused"], "restart reloads LOBBY unpaused")
+    check(sorted(p["id"] for p in host2.players()) == ids, "restart preserves player ids")
+    # the same player sessions reconnect after the reload
+    a2 = Player(svc2, token=token_a)
+    b2 = Player(svc2, token=token_b)
+    check(a2.state["role"] == "player" and b2.state["role"] == "player",
+          "player sessions survive restart")
+    check({a2.state["you"]["playerId"], b2.state["you"]["playerId"]} == set(ids),
+          "session ids preserved")
+    pid_a = a2.state["you"]["playerId"]
+    pid_b = b2.state["you"]["playerId"]
+    # READY still works (no paused-overlay workaround needed)
+    a2.cmd("READY", value=0)
+    a2.wait(lambda gs: any(x["id"] == pid_a and not x["ready"] for x in gs["players"]))
+    a2.cmd("READY", value=1)
+    a2.wait(lambda gs: any(x["id"] == pid_a and x["ready"] for x in gs["players"]))
+    b2.cmd("READY", value=1)
+    b2.wait(lambda gs: any(x["id"] == pid_b and x["ready"] for x in gs["players"]))
+    check(True, "READY accepted after lobby reload")
+    # the host START succeeds from the recovered lobby
+    host2.cmd("START")
+    host2.wait_phase(BOARD)
+    check(host2.gs["phase"] == BOARD, "host START from recovered lobby reaches BOARD")
+    a2.close(); b2.close(); host2.close()
     return svc2
 
 
@@ -673,6 +731,57 @@ def test_native_channel(svc):
             check(cell["daily_double"] == 0, "public display hides daily doubles")
             break
     host.close()
+
+
+def test_host_quit_cancel_keeps_game(svc):
+    """The phone's host controls over authenticated WS: arming QUIT leaves the
+    game running, an ordinary player can never cancel it, CANCEL disarms and
+    keeps playing, and a committed quit propagates to the public display while
+    the authoritative service stays alive."""
+    pin = svc.metadata["joinPin"]
+    host = Player.host(svc, svc.metadata["hostPin"])
+    configure_fast(host)
+    a, b = join_players(svc, ["Ula", "Vic"], pin)
+    host.cmd("START")
+    host.wait_phase(BOARD)
+    a.wait_phase(BOARD, timeout=3); b.wait_phase(BOARD, timeout=3)
+
+    # Arm the quit: the game must stay exactly where it was.
+    host.cmd("QUIT")
+    host.wait(lambda gs: gs.get("quit_confirm") == 1, timeout=3)
+    check(host.gs["quit_confirm"] == 1 and host.gs["quit"] == 0, "quit armed but not committed")
+    check(host.gs["phase"] == BOARD, "armed quit keeps the native game active")
+
+    # A player can neither cancel nor commit a host confirmation.
+    a.cmd("CANCEL")
+    e = a.expect_error()
+    check(e is not None and "host" in (e.get("error", "")), "player cannot CANCEL a host confirmation")
+    check(host.gs["quit_confirm"] == 1, "player CANCEL did not disarm the host confirmation")
+
+    # CANCEL from the phone disarms it and play continues.
+    host.cmd("CANCEL")
+    host.wait(lambda gs: gs.get("quit_confirm") == 0, timeout=3)
+    check(host.gs["quit_confirm"] == 0 and host.gs["quit"] == 0, "cancel disarms the quit")
+    check(host.gs["phase"] == BOARD, "cancel keeps the native game active")
+
+    # Commit: arm then commit; quitting propagates to the shared display.
+    host.cmd("QUIT")
+    host.wait(lambda gs: gs.get("quit_confirm") == 1, timeout=3)
+    host.cmd("QUIT")
+    host.wait(lambda gs: gs.get("quit") == 1, timeout=3)
+    check(host.gs["quit"] == 1, "second confirm commits the quit")
+    pub = None
+    for _ in range(40):
+        pub = svc.public_display()["state"]
+        if pub.get("quit") == 1:
+            break
+        time.sleep(0.05)
+    check(pub is not None and pub.get("quit") == 1, "committed quit propagates to the public display")
+
+    # The authoritative service is not torn down by a quit.
+    st, js, _ = http_get("127.0.0.1", svc.port, "/health")
+    check(st == 200 and js and js.get("ok"), "service stays alive after a committed quit")
+    a.close(); b.close(); host.close()
 
 
 def test_ws_protocol_frames(svc):
@@ -871,6 +980,7 @@ def main():
     run("wsproto", test_ws_protocol_frames)
     run("cap", test_connection_cap)
     run("native", test_native_channel)
+    run("hostquit", test_host_quit_cancel_keeps_game)
     run("buzz", test_buzz_race_and_auth)
     run("replay", test_replay_and_stale)
     run("envelope", test_envelope_strict)
@@ -881,6 +991,9 @@ def main():
     svc2 = run("reconnect", test_reconnect_and_restart)
     if svc2:
         svc2.stop()
+    svc3 = run("lobbyrestart", test_lobby_restart_ready_start)
+    if svc3:
+        svc3.stop()
     run("full", test_full_game, db=large)
 
     # explicit public URL must override LAN autodetection

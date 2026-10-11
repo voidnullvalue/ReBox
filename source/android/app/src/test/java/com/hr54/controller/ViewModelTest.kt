@@ -131,6 +131,23 @@ class ViewModelTest {
         val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent(); vm.pair("abcdef12"); runCurrent(); vm.manage("provider-0", "reinstall"); runCurrent()
         assertTrue(vm.state.value.module("provider-0")!!.installed); assertTrue(vm.state.value.homeModules.any { it.id == "provider-0" }); assertTrue(vm.state.value.ready)
     }
+    @Test fun phoneControllerOnlyOpensForHealthyJeopardyAndClosesWhenUnavailable() = runTest(dispatcher) {
+        val api = FakeReceiverApi()
+        api.modules += ModuleDescriptor("jeopardy", "Jeopardy!", kind = "native-app", installed = true, enabled = true, healthy = true, capabilities = ModuleCapabilities(nativeApp = true))
+        val vm = ControllerViewModel(apiFactory = { api }); vm.connect("receiver"); runCurrent()
+        vm.openPhoneController("provider-0"); runCurrent(); assertFalse(vm.state.value.phoneController)
+        vm.openPhoneController("jeopardy"); runCurrent(); assertTrue(vm.state.value.phoneController); assertEquals("jeopardy", vm.state.value.activeModule)
+        val callsBeforeClose = api.calls.size
+        vm.closePhoneController(); runCurrent(); assertFalse(vm.state.value.phoneController)
+        assertEquals("native close is pure local and never a server/management action", callsBeforeClose, api.calls.size)
+        val i = api.modules.indexOfFirst { it.id == "jeopardy" }
+        api.modules[i] = api.modules[i].copy(healthy = false); vm.refreshModules(); runCurrent()
+        vm.openPhoneController("jeopardy"); runCurrent(); assertFalse(vm.state.value.phoneController); assertNotNull(vm.state.value.message)
+        api.modules[i] = api.modules[i].copy(healthy = true); vm.refreshModules(); runCurrent()
+        vm.openPhoneController("jeopardy"); runCurrent(); assertTrue(vm.state.value.phoneController)
+        api.modules[i] = api.modules[i].copy(enabled = false); vm.refreshModules(); runCurrent(); assertFalse(vm.state.value.phoneController)
+    }
+
     @Test fun revokedBearerDuringActionPollClearsPairing() = runTest(dispatcher) {
         val api = FakeReceiverApi(); val tokens = Tokens(); val vm = ControllerViewModel(apiFactory = { api }, tokens = tokens); vm.connect("receiver"); runCurrent(); vm.pair("abcdef12"); runCurrent(); vm.setForeground(true)
         vm.moduleAction("provider-0", "connect"); runCurrent(); api.expectedToken = "b".repeat(64); advanceTimeBy(2001); runCurrent()

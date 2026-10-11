@@ -59,4 +59,22 @@ class HostComposeTest {
         compose.setContent { Hr54Theme { ModuleManager(previewState, { _, _ -> }, {}, {}, {}, {}) } }
         compose.onNodeWithText("Pair management").assertIsNotEnabled(); compose.onNode(hasScrollAction()).performScrollToNode(hasText("Install module")); compose.onNodeWithText("Install module").assertIsNotEnabled()
     }
+    @Test fun controllerAssetErrorAlwaysOffersAccessibleCloseAndRetry() {
+        var closed = 0; var retried = 0
+        compose.setContent { Hr54Theme { ControllerAssetError("The bundled Jeopardy controller page could not be read", { retried++ }, { closed++ }) } }
+        compose.onNodeWithText("Can't open the phone controller").assertExists()
+        compose.onNodeWithText("Retry").assertExists().performClick()
+        compose.onNodeWithText("Close").assertExists().performClick()
+        compose.runOnIdle { org.junit.Assert.assertEquals(1, retried); org.junit.Assert.assertEquals(1, closed) }
+    }
+    @Test fun connectionHelpShowsReasonAndExplicitUrlWithRetryAndClose() {
+        var closed = 0; var retried = 0
+        compose.setContent { Hr54Theme { ConnectionHelp("http://192.168.88.103:8135/", "The receiver game answered HTTP 503 on its LAN port", { retried++ }, { closed++ }) } }
+        compose.onNodeWithText("Can't reach the game").assertExists()
+        compose.onNodeWithText("The receiver game answered HTTP 503 on its LAN port").assertExists()
+        compose.onNodeWithText("http://192.168.88.103:8135/").assertExists()
+        compose.onNodeWithText("Retry").performClick()
+        compose.onNodeWithText("Close").performClick()
+        compose.runOnIdle { org.junit.Assert.assertEquals(1, retried); org.junit.Assert.assertEquals(1, closed) }
+    }
 }

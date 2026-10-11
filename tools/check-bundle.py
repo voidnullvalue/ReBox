@@ -19,7 +19,7 @@ expected = {
 for name, digest in expected.items():
     assert hashlib.md5((payload/name).read_bytes()).hexdigest() == digest, name
 apk = root/'android/ReBox-controller.apk'
-assert hashlib.sha256(apk.read_bytes()).hexdigest() == 'd41c7684fecafd696fb07acb8e6122cf2719aec59a2535fe35209b2494d3cf81'
+assert hashlib.sha256(apk.read_bytes()).hexdigest() == '94ed0b8e9b816ff30bfcca7d83bdc6d170427218e1c23eb73c3b33c815a81b6f'
 with zipfile.ZipFile(apk) as package:
     assert any(s.startswith('lib/arm64-v8a/') for s in package.namelist())
 assert (payload/'jellyfin/iptv/eng.m3u').read_text().startswith('#EXTM3U')

@@ -63,6 +63,11 @@ tests/test_sdk_native.py    real SDK-environment lifecycle: /native/start/status
 tests/test_seed.c           shared-SDK default seeding + no-replace test
 tests/test_boot_persistence.py  host acceptance for the reboot persistence
                             boot hook + generic launcher (mock iptables, no reboot)
+tests/test_webpage.mjs      headless Node VM UI tests for assets/index.html
+                            (host quit/restart confirmation, cancel, leave,
+                            Android back contract, back-during-armed cancel,
+                            leave-with-CANCEL-ack, fail-closed disconnect,
+                            no-reconnect-after-leave; node optional)
 tests/package_test.py       .rbox archive/mode/limit/architecture checks
 tests/mock_engine.c         mock child for the lifecycle test (not shipped)
 ```
@@ -165,6 +170,66 @@ never to spectators. The TV paints each podium in that player's chosen colour
 (published in the public display alongside the redacted state, never inside it)
 and highlights the actual buzzing player.
 
+## Phone page: exit/cancel and the Android WebView contract
+
+`assets/index.html` is self-contained (no CDN, no external font/script) and is
+embedded byte-for-byte into `bin/module`, served from the same receiver origin
+(`http://<lan>:8135/`). It stays on plain `http`/`ws` via `fetch('/api/...')` and
+`ws://<host>/ws`; it never forces HTTPS and never uses a management or privileged
+token — every action rides the ordinary authenticated role (player token or host
+token) issued by `/api/join` and `/api/host`.
+
+The page never uses the browser's native `confirm`/`prompt`/`alert` dialogs
+(an Android `WebView` does not render them, so the old flow could not exit) and
+never double-sends on a timer. All confirmations are in-page modals:
+
+* **Host controls** are pinned in their own bar directly under the top bar,
+ahead of the scrolling board and the BUZZ button, so Pause/Resume and Quit are
+always reachable.
+* **Quit game / Restart** are two-step and receiver-acknowledged. The first press
+arms the rules core; the modal then waits for the authoritative `state` to echo
+`quit_confirm`/`restart_confirm` before the Commit button enables; the second
+press commits. The commit is refused unless the current role is still `host` and
+the arming `epoch`/`window` still match, so a stale button can never commit after
+a Cancel. **Cancel** sends `JPQ_ACT_CANCEL` and waits for the core to clear the
+flags before closing; a commit already on the wire can't be undone, so Cancel is
+disabled and the result is shown instead. A dropped connection, a rejected
+command or a new `epoch` fails the pending confirmation closed (Commit can never
+fire on its own), and a reconnect never auto-quits.
+* **Leave controller** is local only and never sends a command on a player's
+behalf, so a player keeps their seat/score and an ordinary player can never issue
+a host command. It clears the reconnect timer and detaches the socket so a hidden
+controller cannot reconnect from a late callback; only **Return to game**
+re-enables it. The auth screen's resume path tries both stored tokens through
+`/api/join`, so a host can return too. If the controller being left is a host
+that still has an armed or pending quit/restart, the leave first sends
+`JPQ_ACT_CANCEL` and waits for the receiver to clear the flag before firing the
+close event; if that CANCEL can't be sent, or the socket drops while waiting, the
+leave fails closed — the phone stays connected with clear feedback and never
+pretends the confirmation was cancelled.
+* **Android back contract:** the `WebView` calls
+`window.ReboxJeopardy.requestExit()` (no `addJavascriptInterface`, no Java
+bridge). It uses only the authenticated browser role and returns `true` when it
+took over the gesture: hosts get a Quit game / Leave controller / Cancel menu,
+players and spectators get Stay / Leave controller. When a host confirmation is
+already on screen, the back gesture cancels it on the core and waits for the ack
+rather than swapping to the leave menu (which would strand the server flag); a
+commit in flight can't be undone and is reported instead. Only a locally
+confirmed "Leave controller" dispatches the custom DOM event
+`rebox-controller-close` (detail `{role}`); the event carries no credential and
+no capability. Quitting the game is always the authenticated WebSocket `QUIT`
+command exactly, so the native TV keeps its authority over the exit.
+
+Headless acceptance (Node, skipped when Node is absent) drives the real page
+script against a fake DOM and a controllable WebSocket: the host confirmation
+gate, explicit cancel, local leave, the Android back contract, the back gesture
+during an armed/pending confirmation, leave-with-CANCEL-ack, the fail-closed
+disconnect and the no-reconnect-after-leave latch.
+
+```sh
+node source/hr54-re/modules/jeopardy/tests/test_webpage.mjs
+```
+
 ## Importing questions
 
 The importer is Python-standard-library only and writes the portable `JEPDB1`
@@ -220,3 +285,64 @@ the only working sound path.
   sessions file; hashing tokens at rest is a future hardening step.
 * The 16-connection bound is fixed at compile time and ample for 6 players + host
   + spectators. In-memory state is single-process.
+
+## Release 0.3.1 — embedded controller exit / Android WebView back contract
+
+`0.3.1` is a patch release over `0.3.0` that ships the reviewed phone-controller
+"webexit" work with **no** service, rules or native-renderer behaviour change:
+
+* the self-contained phone page (`assets/index.html`) quits/restarts only through
+  the two-step, receiver-acknowledged host confirmation; **Cancel** clears the
+  armed flag on the core (`JPQ_ACT_CANCEL`) instead of stranding it; and **Leave
+  controller** is local-only — it never sends a command on a player's behalf and
+  the `rebox-controller-close` DOM event carries no credential (see "Phone page:
+  exit/cancel and the Android WebView contract" above).
+* the Android `WebView` back gesture is handled by
+  `window.ReboxJeopardy.requestExit()` (no `addJavascriptInterface`, no Java
+  bridge): hosts get Quit game / Leave controller / Cancel, players and
+  spectators get Stay / Leave controller, and a back press during an armed host
+  confirmation cancels it on the core rather than swapping menus.
+
+The service, rules core, native renderer, package layout and the Android
+controller APK are unchanged. `tests/run.sh` passes with the page's headless
+**96 checks** and the raw-WebSocket LAN **107 checks** (0 failures) and builds
+`build/jeopardy.rbox` sha256
+`db4685f11278581e3d86a3391924142ddfc95b9442c3e9a6a32c23beaf8a22e9`. The
+reviewed `android/ReBox-controller.apk` is byte-identical (sha256
+`94ed0b8e9b816ff30bfcca7d83bdc6d170427218e1c23eb73c3b33c815a81b6f`) and was not
+rebuilt. `0.3.1` was installed through the normal managed module transaction on
+the HR54 `192.168.88.103`; the single persisted player and core pid were
+preserved (see `DEPLOYMENT-HR54.md`).
+
+## Release 0.3.2 — persistence recovery: a reloaded lobby resumes live
+
+`0.3.2` is a patch release over `0.3.1` that fixes authoritative persistence
+recovery after a module upgrade or reboot; the rules core, native renderer,
+package layout and phone page are otherwise unchanged.
+
+* `jpq_load` used to force `paused=1` on every reload. A clean lobby (phase
+  `LOBBY`, no attached clue, `timer.kind = NONE`, no timer remainder) is not a
+  game in progress, so it now reloads **unpaused**: the preserved players can
+  `READY` and the host can `START` immediately. The phone page needs no
+  paused-overlay `RESUME` workaround.
+* Every in-progress phase still reloads safely paused on its saved timer
+  remainder; no active game is auto-started and the native TV surface is never
+  auto-launched.
+* Interrupted two-step quit/restart confirmations are cleared on reload, so a
+  stray next press can never commit a confirmation the operator backed out of.
+* Players, scores, clue database, history, `epoch` and per-actor sequences are
+  preserved exactly.
+* A saved `LOBBY` whose persisted timer is inconsistent fails closed: it stays
+  paused rather than auto-resuming a bogus timer.
+
+`tests/run.sh` passes (webpage 96, host rules 3076, native 44, snapshot 656,
+network 118, sdk-native 28, boot persistence 46, package 19, and the large
+integration suite; 0 failures) and builds `build/jeopardy.rbox` sha256
+`23ea113d1c75b82dff8b5dd4205c49de5d2b196475fd50c0da9f021858d6693b`. The
+reviewed `android/ReBox-controller.apk` is byte-identical (sha256
+`94ed0b8e9b816ff30bfcca7d83bdc6d170427218e1c23eb73c3b33c815a81b6f`) and the
+phone page is unchanged (sha256
+`39ada7bc5768afba38c733111405059dd7d17d126c22f3d1a5a8e0d314f3d8d3`). `0.3.2`
+was installed through the normal managed module transaction on the HR54
+`192.168.88.103`; the persisted player and core pid were preserved and the
+reloaded lobby came back unpaused (see `DEPLOYMENT-HR54.md`).

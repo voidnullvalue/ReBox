@@ -5,8 +5,9 @@
  * parent directory fsync) so a crash never leaves a torn record. Every field is
  * encoded little-endian by hand, so the same file is valid on the big-endian
  * receiver and on a little-endian host. The monotonic deadline is deliberately
- * never written: only the remaining duration and the paused flag survive, and a
- * reloaded game always resumes paused.
+ * never written: only the remaining duration and the paused flag survive. A
+ * reloaded in-progress game always resumes paused; a clean lobby (no clue,
+ * no timer) resumes unpaused because no game is actually running.
  *
  * Corrupt or incompatible saves are preserved as .invalid-NN for recovery and
  * a fresh game is started, matching the project's storage conventions.
@@ -222,6 +223,21 @@ static int game_state_valid(const JpqGame *g) {
     return 1;
 }
 
+/* A saved game may resume unpaused only when it represents an idle lobby:
+ * the phase is LOBBY, no clue is attached and no timer is running or left
+ * over. A lobby whose persisted timer is inconsistent (a stray kind or
+ * remainder) is not trusted to resume and stays safely paused. Anything in
+ * progress is never auto-resumed. (The pre-built Final pool and a stale
+ * daily-double modifier without an attached clue are not an active game: a
+ * restarted/reset lobby legitimately carries them.) */
+static int recovery_is_idle_lobby(const JpqGame *g) {
+    if (g->phase != JPQ_PHASE_LOBBY) return 0;
+    if (g->timer_kind != JPQ_TIMER_NONE) return 0;
+    if (g->timer_remaining_ms != 0 || g->buzz_remaining_ms != 0) return 0;
+    if (g->act_col != -1 || g->act_row != -1) return 0;
+    return 1;
+}
+
 int jpq_save(const JpqGame *g, const char *dir) {
     if (!g || !dir) return -1;
     char path[REBOX_PATH_MAX];
@@ -262,9 +278,19 @@ int jpq_load(JpqGame *g, const char *dir) {
                 struct cur c = {raw + 16, 0, payload, 0};
                 dec_snapshot(&c, g);
                 if (!c.err && game_state_valid(g)) {
-                    /* never trust a persisted deadline; resume paused */
+                    /* never trust a persisted deadline */
                     g->timer_deadline_ms = 0;
-                    g->paused = 1;
+                    /* An interrupted two-step quit/restart confirmation is
+                     * transient UI state: it must never survive a reload and
+                     * silently commit on the next keypress. */
+                    g->quit_confirm = 0;
+                    g->restart_confirm = 0;
+                    /* A clean lobby is not a game in progress: resume it
+                     * unpaused so ordinary players can READY and the host can
+                     * START after a module upgrade or reboot. Every other
+                     * phase - and a lobby with an inconsistent saved timer -
+                     * stays paused on its saved remainder. */
+                    g->paused = recovery_is_idle_lobby(g) ? 0 : 1;
                     ok = 1;
                 }
             }

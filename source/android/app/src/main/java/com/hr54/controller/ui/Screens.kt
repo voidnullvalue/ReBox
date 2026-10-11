@@ -17,7 +17,7 @@ import com.hr54.controller.ui.components.*
 import kotlinx.serialization.json.*
 
 @Composable
-fun HomeScreen(s: ControllerState, navigate: (String) -> Unit, action: (String, Int?) -> Unit, seek: (Double) -> Unit, modifier: Modifier = Modifier) {
+fun HomeScreen(s: ControllerState, navigate: (String) -> Unit, action: (String, Int?) -> Unit, seek: (Double) -> Unit, playOnPhone: (String) -> Unit = {}, modifier: Modifier = Modifier) {
     LazyColumn(modifier, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Your television", style = MaterialTheme.typography.headlineMedium) }
         if (s.playback.playing) item { NowPlayingContent(s.playback, s.receiver, s.playback.duration, s.busy, action, seek) }
@@ -30,6 +30,8 @@ fun HomeScreen(s: ControllerState, navigate: (String) -> Unit, action: (String, 
                         Text(m.name, style = MaterialTheme.typography.titleMedium)
                         Text(if (m.healthy) m.description else m.error.ifBlank { "Module unavailable" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
+                    if (m.supportsPhoneController() && m.healthy)
+                        Button(onClick = { playOnPhone(m.id) }, enabled = !s.busy) { Text("Play on phone") }
                 }
             }
         }
@@ -38,7 +40,8 @@ fun HomeScreen(s: ControllerState, navigate: (String) -> Unit, action: (String, 
 }
 @Composable
 fun ModuleScreen(s: ControllerState, query: TextFieldValue, onQuery: (TextFieldValue) -> Unit, search: () -> Unit,
-    select: (MediaItem) -> Unit, more: () -> Unit, previous: () -> Unit, settings: () -> Unit, native: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    select: (MediaItem) -> Unit, more: () -> Unit, previous: () -> Unit, settings: () -> Unit, native: (Boolean) -> Unit,
+    playOnPhone: () -> Unit = {}, modifier: Modifier = Modifier) {
     val m = s.module(s.activeModule) ?: return
     Column(modifier) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -49,6 +52,7 @@ fun ModuleScreen(s: ControllerState, query: TextFieldValue, onQuery: (TextFieldV
             EmptyState(m.name, m.description)
             if (m.presentation.releaseSurface || m.presentation.releaseInput) Text("Launch with the HR54 remote so the receiver shell can release its display and input. You can stop the app here.", Modifier.padding(horizontal = 16.dp))
             Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (m.supportsPhoneController() && m.healthy) Button(onClick = playOnPhone, enabled = !s.busy) { Text("Play on phone") }
                 Button(onClick = { native(true) }, enabled = !s.busy && !s.system.mediaBusy && !m.presentation.releaseSurface && !m.presentation.releaseInput) { Text("Launch on HR54") }
                 if (s.system.nativeModule == m.id) OutlinedButton(onClick = { native(false) }, enabled = !s.busy) { Text("Stop app") }
             }

@@ -534,7 +534,7 @@ static void test_persistence(const char *tmp) {
     memset(&l, 0, sizeof l);
     jpq_attach(&l, &db, &hist);
     CHECK(jpq_load(&l, dir) == 0);
-    CHECK(l.paused == 1);                     /* always resume paused */
+    CHECK(l.paused == 1);                     /* in-progress game resumes paused */
     CHECK(l.timer_deadline_ms == 0);          /* no monotonic deadline persisted */
     CHECK(l.timer_remaining_ms == remaining);
     CHECK(l.timer_kind == g.timer_kind);
@@ -1151,6 +1151,91 @@ static void test_snapshot_final_dd_phases(void) {
     jfree(root); free(js);
 }
 
+static void test_persistence_lobby_recovery(const char *tmp) {
+    char dir[256];
+    JpqGame l;
+
+    /* A clean lobby (players joined, no game running) resumes unpaused so the
+     * host can START and players can READY after a module upgrade or reboot;
+     * any interrupted two-step confirmation is dropped and the epoch, revision,
+     * sequences, ids and scores are preserved exactly. A real loadable lobby is
+     * a restarted game: boards are built and round is J. */
+    snprintf(dir, sizeof dir, "%s/lobby_ok", tmp); mkdir(dir, 0700);
+    fresh_game(2, NULL);
+    CHECK(apply(JPQ_HOST, JPQ_ACT_RESTART, 0, 0, "") == 0);
+    CHECK(apply(JPQ_HOST, JPQ_ACT_RESTART, 0, 0, "") == 0);
+    CHECK(g.phase == JPQ_PHASE_LOBBY);
+    CHECK(jpq_set_ready(&g, 0, 1) == 0);
+    CHECK(jpq_set_ready(&g, 1, 1) == 0);
+    g.players[0].score = 700;                     /* must survive exactly */
+    g.quit_confirm = 1; g.restart_confirm = 1;   /* interrupted confirmations */
+    g.act_is_dd = 1;                              /* stale modifier, no clue */
+    g.epoch = 0xABCDEF01u; g.revision = 7;
+    g.last_seq[0] = 11; g.last_seq[1] = 12;
+    uint32_t id0 = g.players[0].id, id1 = g.players[1].id;
+    CHECK(jpq_save(&g, dir) == 0);
+    memset(&l, 0, sizeof l); jpq_attach(&l, &db, &hist);
+    CHECK(jpq_load(&l, dir) == 0);
+    CHECK(l.phase == JPQ_PHASE_LOBBY);
+    CHECK(l.paused == 0);                        /* idle lobby resumes live */
+    CHECK(l.quit_confirm == 0 && l.restart_confirm == 0);
+    CHECK(l.timer_deadline_ms == 0);
+    CHECK(l.timer_kind == JPQ_TIMER_NONE);
+    CHECK(l.epoch == 0xABCDEF01u);
+    CHECK(l.revision == 7);
+    CHECK(l.last_seq[0] == 11 && l.last_seq[1] == 12);
+    CHECK(l.player_count == 2);
+    CHECK(l.players[0].id == id0 && l.players[1].id == id1);
+    CHECK(l.players[0].score == 700);
+    CHECK(l.players[0].ready == 1);
+    CHECK(l.players[1].ready == 1);
+    CHECK(!memcmp(&l.board_j, &g.board_j, sizeof g.board_j));
+    /* START from the resumed lobby succeeds with a fresh sequence. */
+    JpqAction a; memset(&a, 0, sizeof a);
+    a.seq = 50; a.epoch = l.epoch; a.revision = l.revision; a.actor = JPQ_HOST; a.type = JPQ_ACT_START;
+    CHECK(jpq_apply(&l, &a, NOW) == 0);
+    CHECK(l.phase == JPQ_PHASE_BOARD);
+
+    /* A saved lobby with an inconsistent (leftover) timer fails closed: it is
+     * not trusted to auto-resume and stays paused instead. */
+    char dir2[256];
+    snprintf(dir2, sizeof dir2, "%s/lobby_badtimer", tmp); mkdir(dir2, 0700);
+    fresh_game(2, NULL);
+    CHECK(apply(JPQ_HOST, JPQ_ACT_RESTART, 0, 0, "") == 0);
+    CHECK(apply(JPQ_HOST, JPQ_ACT_RESTART, 0, 0, "") == 0);
+    CHECK(g.phase == JPQ_PHASE_LOBBY);
+    g.timer_kind = JPQ_TIMER_READ;       /* impossible in a real lobby */
+    g.timer_remaining_ms = 5000;
+    CHECK(jpq_save(&g, dir2) == 0);
+    memset(&l, 0, sizeof l); jpq_attach(&l, &db, &hist);
+    CHECK(jpq_load(&l, dir2) == 0);
+    CHECK(l.phase == JPQ_PHASE_LOBBY);
+    CHECK(l.paused == 1);                /* fail closed, no auto-resume */
+    CHECK(l.timer_deadline_ms == 0);
+    CHECK(l.player_count == 2);
+
+    /* An in-progress phase still resumes safely paused with its remainder and
+     * a dropped confirmation. */
+    char dir3[256];
+    snprintf(dir3, sizeof dir3, "%s/inprogress", tmp); mkdir(dir3, 0700);
+    fresh_game(2, NULL);
+    int col, row; find_cell(&g.board_j, 0, &col, &row);
+    CHECK(apply(JPQ_HOST, JPQ_ACT_SELECT_CLUE, col * JPQ_ROWS + row, 0, "") == 0);
+    uint64_t t0 = NOW;
+    NOW = t0 + g.cfg.read_ms / 3;
+    CHECK(apply(JPQ_HOST, JPQ_ACT_PAUSE, 0, 0, "") == 0);
+    uint64_t rem = g.timer_remaining_ms;
+    CHECK(apply(JPQ_HOST, JPQ_ACT_QUIT, 0, 0, "") == 0);
+    CHECK(g.quit_confirm == 1);
+    CHECK(jpq_save(&g, dir3) == 0);
+    memset(&l, 0, sizeof l); jpq_attach(&l, &db, &hist);
+    CHECK(jpq_load(&l, dir3) == 0);
+    CHECK(l.phase == JPQ_PHASE_CLUE);
+    CHECK(l.paused == 1);
+    CHECK(l.quit_confirm == 0);
+    CHECK(l.timer_remaining_ms == rem);
+}
+
 int main(int argc, char **argv) {
     if (argc < 6) {
         fprintf(stderr, "usage: %s demo.jdb fixtures.jdb tmpdir large.jdb gap.jdb\n", argv[0]);
@@ -1213,6 +1298,7 @@ int main(int argc, char **argv) {
     test_explicit_episode_fail();
     test_episode_mode_requires_complete();
     test_persist_validation(argv[3]);
+    test_persistence_lobby_recovery(argv[3]);
     test_snapshot_final_dd_phases();
 
     jpq_history_free(&hist);
